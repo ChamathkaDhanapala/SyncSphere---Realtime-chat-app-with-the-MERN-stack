@@ -14,7 +14,7 @@ export default function Sidebar({ onSelect, selectedId }) {
   useEffect(() => {
     refreshMe();
     api.get("/api/users").then(({ data }) => setUsers(data));
-  }, []);
+  }, [refreshMe]);
 
   return (
     <div className="h-full w-80 border-r border-slate-800 flex flex-col">
