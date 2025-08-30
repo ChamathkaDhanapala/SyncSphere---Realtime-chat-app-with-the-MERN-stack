@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import Register from "./pages/Register.jsx";
 import Chat from "./pages/Chat.jsx";
@@ -14,11 +14,13 @@ export default function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <Routes>
-          <Route path="/" element={<PrivateRoute><Chat /></PrivateRoute>} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-        </Routes>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<PrivateRoute><Chat /></PrivateRoute>} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+          </Routes>
+        </BrowserRouter>
       </SocketProvider>
     </AuthProvider>
   );
