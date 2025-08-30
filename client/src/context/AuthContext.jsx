@@ -11,39 +11,36 @@ export function AuthProvider({ children }) {
   useEffect(() => { attachToken(token); }, [token]);
 
   const saveAuth = (user, token) => {
-    setUser(user); setToken(token);
+    setUser(user); 
+    setToken(token);
     localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("token", token);
   };
 
   const login = async (email, password) => {
-    const { data } = await api.post("/api/auth/login", { email, password });
+    const { data } = await api.post("/auth/login", { email, password });
     saveAuth(data.user, data.token);
   };
 
   const register = async (username, email, password) => {
-    const { data } = await api.post("/api/auth/register", { username, email, password });
+    const { data } = await api.post("/auth/register", { username, email, password });
     saveAuth(data.user, data.token);
   };
 
   const logout = () => {
-    setUser(null); setToken(null);
-    localStorage.removeItem("user"); localStorage.removeItem("token");
+    setUser(null); 
+    setToken(null);
+    localStorage.removeItem("user"); 
+    localStorage.removeItem("token");
   };
 
   const refreshMe = async () => {
     if (!token) return;
-    const { data } = await api.get("/api/auth/me");
+    const { data } = await api.get("/auth/me");
     setUser(data.user);
     localStorage.setItem("user", JSON.stringify(data.user));
   };
 
-  const updateProfile = async (formData) => {
-    const { data } = await api.put("/api/users/me", formData, { headers: { "Content-Type": "multipart/form-data" }});
-    setUser(data);
-    localStorage.setItem("user", JSON.stringify(data));
-  };
-
-  const value = { user, token, login, register, logout, updateProfile, refreshMe };
+  const value = { user, token, login, register, logout, refreshMe };
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }
