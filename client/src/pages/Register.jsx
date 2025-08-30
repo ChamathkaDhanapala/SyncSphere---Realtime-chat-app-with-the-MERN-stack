@@ -4,19 +4,36 @@ import { useAuth } from "../context/AuthContext.jsx";
 
 export default function Register() {
   const nav = useNavigate();
-  const { register } = useAuth();
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const { register, loading, error } = useAuth();
+  const [formData, setFormData] = useState({
+    username: "",
+    email: "",
+    password: ""
+  });
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    
+    
+    if (!formData.username || !formData.email || !formData.password) {
+      return;
+    }
+    
     try {
-      await register(username, email, password);
-      nav("/");
+      const result = await register(formData.username, formData.email, formData.password);
+      
+      if (result.success) {
+        nav("/"); 
+      }
     } catch (e) {
-      setError(e?.response?.data?.message || "Registration failed");
+      console.error("Registration error:", e);
     }
   };
 
@@ -26,12 +43,43 @@ export default function Register() {
         <h1 className="text-2xl font-semibold mb-6">Create your account</h1>
         {error && <p className="text-red-400 mb-2">{error}</p>}
         <form onSubmit={onSubmit} className="space-y-4">
-          <input value={username} onChange={e=>setUsername(e.target.value)} placeholder="Username" className="w-full p-3 rounded-xl outline-none" />
-          <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" className="w-full p-3 rounded-xl outline-none" />
-          <input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" className="w-full p-3 rounded-xl outline-none" />
-          <button className="w-full p-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 transition">Sign up</button>
+          <input 
+            name="username"
+            value={formData.username} 
+            onChange={handleChange} 
+            placeholder="Username" 
+            className="w-full p-3 rounded-xl outline-none" 
+            disabled={loading}
+          />
+          <input 
+            name="email"
+            type="email"
+            value={formData.email} 
+            onChange={handleChange} 
+            placeholder="Email" 
+            className="w-full p-3 rounded-xl outline-none" 
+            disabled={loading}
+          />
+          <input 
+            name="password"
+            type="password" 
+            value={formData.password} 
+            onChange={handleChange} 
+            placeholder="Password" 
+            className="w-full p-3 rounded-xl outline-none" 
+            disabled={loading}
+          />
+          <button 
+            type="submit"
+            className="w-full p-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={loading}
+          >
+            {loading ? "Creating account..." : "Sign up"}
+          </button>
         </form>
-        <p className="mt-4 text-sm text-slate-400">Already have an account? <Link to="/login" className="text-emerald-400">Log in</Link></p>
+        <p className="mt-4 text-sm text-slate-400">
+          Already have an account? <Link to="/login" className="text-emerald-400">Log in</Link>
+        </p>
       </div>
     </div>
   );
