@@ -19,9 +19,10 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    const s = io(import.meta.env.VITE_API_URL || "http://localhost:5000", {
+    const s = io(process.env.REACT_APP_API_URL || "http://localhost:5000", {
       auth: { token },
     });
+
 
     setSocket(s);
 
@@ -41,9 +42,9 @@ export function SocketProvider({ children }) {
 
 
   const value = useMemo(() => {
-  const isOnline = (userId) => onlineMap.has(userId); 
-  return { socket, isOnline };
-}, [socket, onlineMap]);
+    const isOnline = (userId) => onlineMap.has(userId);
+    return { socket, isOnline };
+  }, [socket, onlineMap]);
 
 
   return <SocketCtx.Provider value={value}>{children}</SocketCtx.Provider>;
