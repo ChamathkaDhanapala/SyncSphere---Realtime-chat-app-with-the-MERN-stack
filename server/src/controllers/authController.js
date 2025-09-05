@@ -1,5 +1,6 @@
 import User from "../models/User.js";
-import { generateToken } from "../utils/generateToken.js";
+import generateToken from "../utils/generateToken.js";
+
 
 export async function register(req, res) {
   try {
