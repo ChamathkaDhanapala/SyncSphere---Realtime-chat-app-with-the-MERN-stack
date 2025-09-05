@@ -11,15 +11,23 @@ const userSchema = new mongoose.Schema({
   lastSeen: { type: Date, default: null }
 }, { timestamps: true });
 
+
 userSchema.pre("save", async function(next) {
   if (!this.isModified("password")) return next();
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+  
+  
+  this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
-userSchema.methods.matchPassword = async function(entered) {
-  return bcrypt.compare(entered, this.password);
+
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  try {
+    return await bcrypt.compare(enteredPassword, this.password);
+  } catch (error) {
+    console.error("Password comparison error:", error);
+    return false;
+  }
 };
 
 userSchema.methods.toJSON = function() {
