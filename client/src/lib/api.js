@@ -2,8 +2,12 @@ import axios from "axios";
 
 const API_URL = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
+
+let authToken = null;
+
+
 export const api = axios.create({
-  baseURL: `${API_URL}/api`, 
+  baseURL: `${API_URL}/api`,
 });
 
 
@@ -13,13 +17,19 @@ api.interceptors.request.use((config) => {
   console.log("Endpoint:", config.url);
   console.log("Base URL:", config.baseURL);
   console.log("Full URL:", config.baseURL + config.url);
-  console.log("Headers:", config.headers);
+  console.log("Headers before token:", config.headers);
+
+  if (authToken) {
+    config.headers.Authorization = `Bearer ${authToken}`;
+  }
+
+  console.log("Headers after token:", config.headers);
   console.log("Data:", config.data);
   console.log("========================");
   return config;
 });
 
-// Add response debugging too
+
 api.interceptors.response.use(
   (response) => {
     console.log("=== API RESPONSE SUCCESS ===");
@@ -31,7 +41,7 @@ api.interceptors.response.use(
   },
   (error) => {
     console.log("=== API RESPONSE ERROR ===");
-    console.log("URL:", error.config.url);
+    console.log("URL:", error.config?.url);
     console.log("Status:", error.response?.status);
     console.log("Error:", error.message);
     console.log("Full error:", error);
@@ -40,9 +50,7 @@ api.interceptors.response.use(
   }
 );
 
-export function attachToken(token) {
-  api.interceptors.request.use((config) => {
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  });
+
+export function setToken(token) {
+  authToken = token;
 }
