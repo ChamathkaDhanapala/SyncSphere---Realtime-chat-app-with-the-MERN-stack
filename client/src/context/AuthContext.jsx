@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
-import { api, attachToken } from "../lib/api.js";
+import { api, setToken as setApiToken } from "../lib/api.js";
+
 
 const AuthCtx = createContext(null);
 export function useAuth() { return useContext(AuthCtx); }
@@ -17,12 +18,13 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => { 
-    attachToken(token); 
+  useEffect(() => {
+    setApiToken(token);
   }, [token]);
 
+
   const saveAuth = (user, token) => {
-    setUser(user); 
+    setUser(user);
     setToken(token);
     localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("token", token);
@@ -30,9 +32,9 @@ export function AuthProvider({ children }) {
   };
 
   const clearAuth = () => {
-    setUser(null); 
+    setUser(null);
     setToken(null);
-    localStorage.removeItem("user"); 
+    localStorage.removeItem("user");
     localStorage.removeItem("token");
   };
 
@@ -40,7 +42,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/auth/login", { email, password }); 
+      const { data } = await api.post("/auth/login", { email, password });
       saveAuth(data.user, data.token);
       return { success: true };
     } catch (error) {
@@ -57,7 +59,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/auth/register", { username, email, password }); 
+      const { data } = await api.post("/auth/register", { username, email, password });
       saveAuth(data.user, data.token);
       return { success: true };
     } catch (error) {
@@ -78,12 +80,12 @@ export function AuthProvider({ children }) {
   const refreshMe = async () => {
     if (!token) return;
     try {
-      const { data } = await api.get("/auth/me"); 
+      const { data } = await api.get("/auth/me");
       setUser(data.user);
       localStorage.setItem("user", JSON.stringify(data.user));
     } catch (error) {
       console.error("Error refreshing user data:", error);
-      
+
       if (error.response?.status === 401) {
         clearAuth();
       }
