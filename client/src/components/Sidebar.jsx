@@ -13,7 +13,7 @@ export default function Sidebar({ onSelect, selectedId }) {
 
   useEffect(() => {
     refreshMe();
-    api.get("/api/users").then(({ data }) => setUsers(data));
+   api.get("/users").then(({ data }) => setUsers(data));
   }, [refreshMe]);
 
   return (
@@ -31,7 +31,7 @@ export default function Sidebar({ onSelect, selectedId }) {
       <div className="p-2">
         <input placeholder="Search people..." className="w-full p-2 rounded-xl" onChange={(e)=>{
           const q = e.target.value.toLowerCase();
-          api.get("/api/users").then(({ data }) => setUsers(data.filter(u=>u.username.toLowerCase().includes(q))));
+          api.get("/users").then(({ data }) => setUsers(data.filter(u=>u.username.toLowerCase().includes(q))));
         }} />
       </div>
 
