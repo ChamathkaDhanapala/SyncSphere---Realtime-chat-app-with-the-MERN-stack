@@ -1,4 +1,6 @@
 import User from "../models/User.js";
+import path from "path";
+import fs from "fs";
 
 export async function listUsers(req, res) {
   try {
@@ -7,20 +9,35 @@ export async function listUsers(req, res) {
   } catch (e) {
     res.status(500).json({ message: "Server error" });
   }
-}
+};
 
-export async function updateProfile(req, res) {
+export const updateProfile = async (req, res) => {
   try {
     const { username, bio } = req.body;
-    if (username !== undefined) req.user.username = username;
-    if (bio !== undefined) req.user.bio = bio;
+    const updateData = {};
+
+    if (username) updateData.username = username;
+    if (bio !== undefined) updateData.bio = bio;
+
     if (req.file) {
-      // simple local storage path
-      req.user.avatarUrl = `/uploads/${req.file.filename}`;
+      if (req.user.avatarUrl) {
+        const oldAvatarPath = path.join("uploads", path.basename(req.user.avatarUrl));
+        if (fs.existsSync(oldAvatarPath)) {
+          fs.unlinkSync(oldAvatarPath);
+        }
+      }
+      updateData.avatarUrl = `/uploads/${req.file.filename}`;
     }
-    await req.user.save();
-    res.json(req.user.toJSON());
-  } catch (e) {
-    res.status(500).json({ message: "Server error" });
+
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select("-password");
+
+    res.json({ user: updatedUser });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ message: "Server error updating profile" });
   }
-}
+};

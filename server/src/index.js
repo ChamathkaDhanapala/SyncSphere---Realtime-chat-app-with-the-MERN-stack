@@ -10,8 +10,13 @@ import userRoutes from "./routes/userRoutes.js";
 import messageRoutes from "./routes/messageRoutes.js"; 
 import { connectDB } from "./config/db.js";
 import { setupSocket } from "./socket.js";
+import path from "path"; 
+import { fileURLToPath } from "url"; 
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = createServer(app);
@@ -29,7 +34,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json());
-app.use("/uploads", express.static("uploads")); 
+app.use("/uploads", express.static(path.join(__dirname, "../uploads"))); 
 
 
 app.use("/api", authRoutes);
