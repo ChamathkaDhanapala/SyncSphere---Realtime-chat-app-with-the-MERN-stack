@@ -27,25 +27,28 @@ export default function EditProfileModal({ open, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm grid place-items-center p-4 z-50">
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div 
-        className="bg-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md p-6 transform transition-all duration-300"
+        className="bg-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md my-8" // Added my-8 for vertical margin
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-white">Edit Profile</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors duration-200 p-1 rounded-lg hover:bg-gray-700/50"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+        {/* Header  */}
+        <div className="sticky top-0 bg-gray-800/90 backdrop-blur-xl border-b border-gray-700/50 p-6 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-white">Edit Profile</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white transition-colors duration-200 p-1 rounded-lg hover:bg-gray-700/50"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-5">
+        {/* Scrollable Content */}
+        <div className="max-h-[60vh] overflow-y-auto p-6 space-y-5">
           {/* Current Avatar Preview */}
           <div className="flex items-center space-x-4">
             <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-xl">
@@ -117,9 +120,11 @@ export default function EditProfileModal({ open, onClose }) {
               </p>
             )}
           </div>
+        </div>
 
-          {/* Buttons */}
-          <div className="flex gap-3 justify-end pt-4">
+        {/* Buttons */}
+        <div className="sticky bottom-0 bg-gray-800/90 backdrop-blur-xl border-t border-gray-700/50 p-6 rounded-b-2xl">
+          <div className="flex gap-3 justify-end">
             <button 
               onClick={onClose}
               className="px-6 py-3 rounded-xl border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200 font-medium"
