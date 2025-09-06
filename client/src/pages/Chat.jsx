@@ -25,8 +25,16 @@ export default function Chat() {
 
   const selectPeer = async (u) => {
     setPeer(u);
-    const { data } = await api.get(`/api/messages/${u._id}`);
-    setMessages(data);
+    try {
+      const { data } = await api.get(`/api/messages/${u._id}`);
+      setMessages(data);
+    } catch (error) {
+      if (error.response?.status === 404) {
+        setMessages([]);
+      } else {
+        console.error("Error fetching messages:", error);
+      }
+    }
   };
 
   const send = (text) => {
@@ -42,18 +50,18 @@ export default function Chat() {
         <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-gray-800 rounded-full blur-3xl opacity-10 animate-pulse delay-1000"></div>
       </div>
 
-      <div className="relative z-10 h-screen grid grid-cols-[20rem_1fr] backdrop-blur-sm">
-        {/* Sidebar with glass effect */}
-        <div className="bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50">
+      <div className="relative z-10 h-screen flex">
+        {/* Sidebar - Made more visible */}
+        <div className="w-80 bg-gray-800/90 backdrop-blur-xl border-r border-gray-700/50 shadow-2xl">
           <Sidebar onSelect={selectPeer} selectedId={peer?._id} />
         </div>
         
         {/* Main Chat Area */}
-        <div className="flex flex-col bg-gray-900/60 backdrop-blur-xl">
+        <div className="flex-1 flex flex-col">
           {peer ? (
             <>
               {/* Chat Header */}
-              <div className="bg-gray-800/70 border-b border-gray-700/50 px-6 py-4">
+              <div className="bg-gray-800/80 border-b border-gray-700/50 px-6 py-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
                     <span className="text-white font-semibold">
@@ -79,12 +87,12 @@ export default function Chat() {
               </div>
 
               {/* Chat Window */}
-              <div className="flex-1 overflow-hidden">
+              <div className="flex-1 overflow-hidden bg-gray-900/50">
                 <ChatWindow me={user} peer={peer} messages={messages} />
               </div>
 
               {/* Message Input */}
-              <div className="bg-gray-800/70 border-t border-gray-700/50 p-4">
+              <div className="bg-gray-800/80 border-t border-gray-700/50 p-4">
                 <MessageInput onSend={send} />
               </div>
             </>
