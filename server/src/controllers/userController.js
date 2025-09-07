@@ -13,31 +13,80 @@ export async function listUsers(req, res) {
 
 export const updateProfile = async (req, res) => {
   try {
+    console.log("=== BACKEND UPDATE PROFILE ===");
+    console.log("Request body:", req.body);
+    console.log("Request file:", req.file);
+    console.log("User ID:", req.user._id);
+
     const { username, bio } = req.body;
-    const updateData = {};
+    const updates = {};
 
-    if (username) updateData.username = username;
-    if (bio !== undefined) updateData.bio = bio;
+    if (username !== undefined && username.trim() !== "") {
+      updates.username = username.trim();
 
-    if (req.file) {
-      if (req.user.avatarUrl) {
-        const oldAvatarPath = path.join("uploads", path.basename(req.user.avatarUrl));
-        if (fs.existsSync(oldAvatarPath)) {
-          fs.unlinkSync(oldAvatarPath);
-        }
+      const existingUser = await User.findOne({
+        username: username.trim(),
+        _id: { $ne: req.user._id }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({ message: "Username already exists" });
       }
-      updateData.avatarUrl = `/uploads/${req.file.filename}`;
     }
 
-    const updatedUser = await User.findByIdAndUpdate(
+
+    if (bio !== undefined) {
+      updates.bio = bio;
+    }
+
+    if (req.file) {
+      updates.avatarUrl = `/uploads/${req.file.filename}`;
+      console.log("New avatar URL:", updates.avatarUrl);
+    }
+
+    console.log("Updates to apply:", updates);
+
+    const user = await User.findByIdAndUpdate(
       req.user._id,
-      updateData,
-      { new: true, runValidators: true }
+      { $set: updates },
+      {
+        new: true,
+        runValidators: true
+      }
     ).select("-password");
 
-    res.json({ user: updatedUser });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    console.log("Updated user:", user);
+
+    const userResponse = {
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      bio: user.bio,
+      avatarUrl: user.avatarUrl ? `${user.avatarUrl}?t=${Date.now()}` : user.avatarUrl,
+      online: user.online,
+      lastSeen: user.lastSeen
+    };
+    res.json({
+      message: "Profile updated successfully",
+      user: userResponse
+    });
+
   } catch (error) {
-    console.error("Update profile error:", error);
+    console.error("Profile update error:", error);
+
+    if (error.name === "ValidationError") {
+      const errors = Object.values(error.errors).map(val => val.message);
+      return res.status(400).json({ message: "Validation error", errors });
+    }
+
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "Username already exists" });
+    }
+
     res.status(500).json({ message: "Server error updating profile" });
   }
 };
