@@ -30,17 +30,22 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 5000;
 
-
-app.use(cors());
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  credentials: true
+}));
 app.use(morgan("dev"));
 app.use(express.json());
-app.use("/uploads", express.static(path.join(__dirname, "../uploads"))); 
 
+app.use("/uploads", (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || "http://localhost:3000");
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+}, express.static(path.join(__dirname, "../uploads")));
 
 app.use("/api", authRoutes);
 app.use("/api/users", userRoutes);        
 app.use("/api/messages", messageRoutes);  
-
 
 setupSocket(io);
 
