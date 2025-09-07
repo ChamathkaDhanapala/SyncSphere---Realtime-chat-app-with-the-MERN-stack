@@ -11,15 +11,30 @@ export default function Sidebar({ onSelect, selectedId }) {
   const [searchQuery, setSearchQuery] = useState("");
   const { user, logout, refreshMe } = useAuth();
   const { isOnline } = useSocket();
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     refreshMe();
     api.get("/users").then(({ data }) => setUsers(data));
-  }, [refreshMe]);
+  }, [refreshMe, refreshTrigger]);
 
-  const filteredUsers = users.filter(u => 
+  const filteredUsers = users.filter(u =>
     u.username.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+
+  const handleProfileUpdated = () => {
+    setRefreshTrigger(prev => prev + 1);
+    refreshMe();
+  };
+
+
+  console.log("Current user avatarUrl:", user?.avatarUrl);
+  console.log("All users:", users.map(u => ({
+    username: u.username,
+    avatarUrl: u.avatarUrl,
+    _id: u._id
+  })));
 
   return (
     <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
@@ -30,22 +45,22 @@ export default function Sidebar({ onSelect, selectedId }) {
           <div className="text-white font-semibold truncate">{user?.username}</div>
           <div className="text-xs text-gray-400 truncate">{user?.email}</div>
         </div>
-        <button 
-          onClick={() => setOpen(true)} 
+        <button
+          onClick={() => setOpen(true)}
           className="px-3 py-1.5 rounded-xl border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200"
           title="Edit Profile"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 极H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </button>
-        <button 
-          onClick={logout} 
+        <button
+          onClick={logout}
           className="px-3 py-1.5 rounded-xl bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 transition-all duration-200"
           title="Logout"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a极 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </button>
       </div>
@@ -55,11 +70,11 @@ export default function Sidebar({ onSelect, selectedId }) {
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path strokeLinecap="round" stroke极join="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <input 
-            placeholder="Search people..." 
+          <input
+            placeholder="Search people..."
             className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -86,16 +101,20 @@ export default function Sidebar({ onSelect, selectedId }) {
           </div>
         ) : (
           filteredUsers.map(u => (
-            <button 
-              key={u._id} 
-              onClick={() => onSelect(u)} 
-              className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all duration-200 ${
-                selectedId === u._id 
-                  ? "bg-blue-600/20 border-r-2 border-blue-500" 
-                  : "hover:bg-gray-700/50"
-              }`}
+            <button
+              key={u._id}
+              onClick={() => onSelect(u)}
+              className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all duration-200 ${selectedId === u._id
+                ? "bg-blue-600/20 border-r-2 border-blue-500"
+                : "hover:bg-gray-700/50"
+                }`}
             >
-              <Avatar url={u.avatarUrl} size={9} online={isOnline(u._id)} />
+              <Avatar
+                url={user?.avatarUrl}
+                size={10}
+                online={true}
+                onError={() => console.log("Current user avatar failed to load")}
+              />
               <div className="flex-1 min-w-0">
                 <div className="text-white font-medium truncate">{u.username}</div>
                 <div className="text-xs flex items-center">
@@ -128,7 +147,11 @@ export default function Sidebar({ onSelect, selectedId }) {
         </div>
       </div>
 
-      <EditProfileModal open={open} onClose={() => setOpen(false)} />
+      <EditProfileModal
+        open={open}
+        onClose={() => setOpen(false)}
+        onProfileUpdated={handleProfileUpdated}
+      />
     </div>
   );
 }
