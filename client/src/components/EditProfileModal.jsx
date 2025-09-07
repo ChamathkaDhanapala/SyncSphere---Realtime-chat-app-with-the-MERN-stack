@@ -1,35 +1,81 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
-export default function EditProfileModal({ open, onClose }) {
+export default function EditProfileModal({ open, onClose ,onProfileUpdated}) {
   const { user, updateProfile } = useAuth();
   const [username, setUsername] = useState(user?.username || "");
   const [bio, setBio] = useState(user?.bio || "");
   const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(user?.avatarUrl || null);
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [error, setError] = useState("");
+  const [imageLoading, setImageLoading] = useState(false);
+
   if (!open) return null;
 
-  const onSave = async () => {
-    setIsLoading(true);
-    try {
-      const fd = new FormData();
-      fd.append("username", username);
-      fd.append("bio", bio);
-      if (file) fd.append("avatar", file);
-      await updateProfile(fd);
-      onClose();
-    } catch (error) {
-      console.error("Update error:", error);
-    } finally {
-      setIsLoading(false);
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (selectedFile) {
+      if (selectedFile.size > 5 * 1024 * 1024) {
+        setError("File size must be less than 5MB");
+        return;
+      }
+
+      if (!selectedFile.type.startsWith('image/')) {
+        setError("Please select an image file");
+        return;
+      }
+
+      setFile(selectedFile);
+      setError("");
+      setPreviewUrl(URL.createObjectURL(selectedFile));
     }
   };
 
+const onSave = async () => {
+  setIsLoading(true);
+  setImageLoading(true);
+  setError("");
+  try {
+    const fd = new FormData();
+    fd.append("username", username);
+    fd.append("bio", bio);
+    if (file) {
+      fd.append("avatar", file);
+    }
+
+    console.log("Sending FormData with:", {
+      username,
+      bio,
+      hasFile: !!file,
+      fileName: file?.name
+    });
+
+    await updateProfile(fd);
+    
+    if (onProfileUpdated) {
+      onProfileUpdated();
+    }
+    
+    onClose();
+  } catch (error) {
+    console.error("Update error:", error);
+    if (error.response) {
+      setError(error.response.data.message || "Failed to update profile. Please try again.");
+    } else if (error.request) {
+      setError("Network error. Please check your connection.");
+    } else {
+      setError(error.message || "An unexpected error occurred.");
+    }
+  } finally {
+    setIsLoading(false);
+    setImageLoading(false);
+  }
+};
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div 
-        className="bg-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md my-8" // Added my-8 for vertical margin
+      <div
+        className="bg-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md my-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header  */}
@@ -40,39 +86,62 @@ export default function EditProfileModal({ open, onClose }) {
               onClick={onClose}
               className="text-gray-400 hover:text-white transition-colors duration-200 p-1 rounded-lg hover:bg-gray-700/50"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+</svg>
             </button>
           </div>
         </div>
 
         {/* Scrollable Content */}
         <div className="max-h-[60vh] overflow-y-auto p-6 space-y-5">
+          {/* Error message */}
+          {error && (
+            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Current Avatar Preview */}
           <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-xl">
-              {user?.avatarUrl ? (
-                <img 
-                  src={user.avatarUrl} 
-                  alt="Profile" 
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-xl overflow-hidden">
+              {imageLoading ? (
+                <div className="w-16 h-16 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Profile preview"
                   className="w-16 h-16 rounded-full object-cover"
+                  onLoad={() => setImageLoading(false)}
+                  onError={() => setImageLoading(false)}
+                />
+              ) : user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt="Profile"
+                  className="w-16 h-16 rounded-full object-cover"
+                  onLoad={() => setImageLoading(false)}
+                  onError={() => setImageLoading(false)}
                 />
               ) : (
                 user?.username?.charAt(0)?.toUpperCase()
               )}
             </div>
             <div>
-              <p className="text-white font-medium">Current Avatar</p>
-              <p className="text-gray-400 text-sm">Upload a new image below</p>
+              <p className="text-white font-medium">Profile Picture</p>
+              <p className="text-gray-400 text-sm">
+                {file ? "New image selected" : imageLoading ? "Loading image..." : "Upload a new image below"}
+              </p>
             </div>
           </div>
 
           {/* Username */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-300">Display Name</label>
-            <input 
-              value={username} 
+            <input
+              value={username}
               onChange={e => setUsername(e.target.value)}
               className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
               placeholder="Enter your display name"
@@ -82,8 +151,8 @@ export default function EditProfileModal({ open, onClose }) {
           {/* Bio */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-300">Bio</label>
-            <textarea 
-              value={bio} 
+            <textarea
+              value={bio}
               onChange={e => setBio(e.target.value)}
               rows="3"
               className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
@@ -95,14 +164,14 @@ export default function EditProfileModal({ open, onClose }) {
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-300">Profile Picture</label>
             <div className="relative">
-              <input 
-                type="file" 
+              <input
+                type="file"
                 accept="image/*"
-                onChange={e => setFile(e.target.files[0])}
+                onChange={handleFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 id="avatar-upload"
               />
-              <label 
+              <label
                 htmlFor="avatar-upload"
                 className="block w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl text-gray-400 cursor-pointer hover:bg-gray-700/70 transition-all duration-200 border-dashed"
               >
@@ -125,13 +194,13 @@ export default function EditProfileModal({ open, onClose }) {
         {/* Buttons */}
         <div className="sticky bottom-0 bg-gray-800/90 backdrop-blur-xl border-t border-gray-700/50 p-6 rounded-b-2xl">
           <div className="flex gap-3 justify-end">
-            <button 
+            <button
               onClick={onClose}
               className="px-6 py-3 rounded-xl border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200 font-medium"
             >
               Cancel
             </button>
-            <button 
+            <button
               onClick={onSave}
               disabled={isLoading}
               className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium hover:from-blue-500 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -142,7 +211,7 @@ export default function EditProfileModal({ open, onClose }) {
                   Saving...
                 </div>
               ) : (
-                "Save Changes"
+                "Save"
               )}
             </button>
           </div>
