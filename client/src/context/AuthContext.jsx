@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { api, setToken as setApiToken } from "../lib/api.js";
 
-
 const AuthCtx = createContext(null);
 export function useAuth() { return useContext(AuthCtx); }
 
@@ -21,7 +20,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setApiToken(token);
   }, [token]);
-
 
   const saveAuth = (user, token) => {
     setUser(user);
@@ -92,6 +90,40 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const value = { user, token, loading, error, login, register, logout, refreshMe };
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
+  const updateProfile = async (formData) => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const { data } = await api.put("/users/me", formData);
+
+      console.log("Update profile response:", data);
+
+      setUser(data.user);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      return data;
+    } catch (error) {
+      console.error("Update profile error:", error);
+      const errorMessage = error.response?.data?.message || "Failed to update profile. Please try again.";
+      setError(errorMessage);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const value = {
+    user,
+    token,
+    loading,
+    error,
+    login,
+    register,
+    logout,
+    refreshMe,
+    updateProfile 
+  };
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
