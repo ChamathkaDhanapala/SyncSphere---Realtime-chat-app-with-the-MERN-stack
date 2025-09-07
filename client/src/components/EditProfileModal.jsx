@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
-export default function EditProfileModal({ open, onClose ,onProfileUpdated}) {
+export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
   const { user, updateProfile } = useAuth();
   const [username, setUsername] = useState(user?.username || "");
   const [bio, setBio] = useState(user?.bio || "");
@@ -32,46 +32,46 @@ export default function EditProfileModal({ open, onClose ,onProfileUpdated}) {
     }
   };
 
-const onSave = async () => {
-  setIsLoading(true);
-  setImageLoading(true);
-  setError("");
-  try {
-    const fd = new FormData();
-    fd.append("username", username);
-    fd.append("bio", bio);
-    if (file) {
-      fd.append("avatar", file);
-    }
+  const onSave = async () => {
+    setIsLoading(true);
+    setImageLoading(true);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("username", username);
+      fd.append("bio", bio);
+      if (file) {
+        fd.append("avatar", file);
+      }
 
-    console.log("Sending FormData with:", {
-      username,
-      bio,
-      hasFile: !!file,
-      fileName: file?.name
-    });
+      console.log("Sending FormData with:", {
+        username,
+        bio,
+        hasFile: !!file,
+        fileName: file?.name
+      });
 
-    await updateProfile(fd);
-    
-    if (onProfileUpdated) {
-      onProfileUpdated();
+      await updateProfile(fd);
+
+      if (onProfileUpdated) {
+        onProfileUpdated();
+      }
+
+      onClose();
+    } catch (error) {
+      console.error("Update error:", error);
+      if (error.response) {
+        setError(error.response.data.message || "Failed to update profile. Please try again.");
+      } else if (error.request) {
+        setError("Network error. Please check your connection.");
+      } else {
+        setError(error.message || "An unexpected error occurred.");
+      }
+    } finally {
+      setIsLoading(false);
+      setImageLoading(false);
     }
-    
-    onClose();
-  } catch (error) {
-    console.error("Update error:", error);
-    if (error.response) {
-      setError(error.response.data.message || "Failed to update profile. Please try again.");
-    } else if (error.request) {
-      setError("Network error. Please check your connection.");
-    } else {
-      setError(error.message || "An unexpected error occurred.");
-    }
-  } finally {
-    setIsLoading(false);
-    setImageLoading(false);
-  }
-};
+  };
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
       <div
@@ -87,8 +87,8 @@ const onSave = async () => {
               className="text-gray-400 hover:text-white transition-colors duration-200 p-1 rounded-lg hover:bg-gray-700/50"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-</svg>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
             </button>
           </div>
         </div>
