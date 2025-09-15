@@ -11,9 +11,15 @@ import {
   CircularProgress,
   Typography,
   InputAdornment,
-  IconButton
+  IconButton,
 } from "@mui/material";
-import { Visibility, VisibilityOff, Lock, Email, AdminPanelSettings } from "@mui/icons-material";
+import {
+  Visibility,
+  VisibilityOff,
+  Lock,
+  Email,
+  AdminPanelSettings,
+} from "@mui/icons-material";
 
 export default function AdminLogin() {
   const nav = useNavigate();
@@ -21,33 +27,35 @@ export default function AdminLogin() {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
-    showPassword: false
+    showPassword: false,
   });
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: e.target.value,
     });
   };
 
   const handleClickShowPassword = () => {
     setFormData({
       ...formData,
-      showPassword: !formData.showPassword
+      showPassword: !formData.showPassword,
     });
   };
 
   const onSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.email || !formData.password) {
       return;
     }
-    
+
     try {
-      await login(formData.email, formData.password);
-      nav("/admin/dashboard");
+      const result = await login(formData.email, formData.password, true);
+      if (result.success) {
+        nav("/admin/dashboard");
+      }
     } catch (e) {
       console.error("Admin login error:", e);
     }
@@ -57,7 +65,8 @@ export default function AdminLogin() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #e6e6fa 0%, #d8bfd8 50%, #b0c4de 100%)",
+        background:
+          "linear-gradient(135deg, #e6e6fa 0%, #d8bfd8 50%, #b0c4de 100%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -73,7 +82,8 @@ export default function AdminLogin() {
           width: "300px",
           height: "300px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(128, 0, 128, 0.15) 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(128, 0, 128, 0.15) 0%, transparent 70%)",
           animation: "float 15s infinite ease-in-out",
         },
         "&::after": {
@@ -84,13 +94,14 @@ export default function AdminLogin() {
           width: "400px",
           height: "400px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(0, 0, 255, 0.1) 0%, transparent 70%)",
+          background:
+            "radial-gradient(circle, rgba(0, 0, 255, 0.1) 0%, transparent 70%)",
           animation: "float 18s infinite ease-in-out reverse",
         },
         "@keyframes float": {
           "0%, 100%": { transform: "translateY(0) rotate(0deg)" },
           "50%": { transform: "translateY(-20px) rotate(5deg)" },
-        }
+        },
       }}
     >
       <Container component="main" maxWidth="sm">
@@ -105,11 +116,12 @@ export default function AdminLogin() {
             color: "white",
             position: "relative",
             zIndex: 1,
-            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(75, 0, 130, 0.4)",
+            boxShadow:
+              "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(75, 0, 130, 0.4)",
             transition: "transform 0.3s ease",
             "&:hover": {
               transform: "scale(1.02)",
-            }
+            },
           }}
         >
           <Box
@@ -117,7 +129,7 @@ export default function AdminLogin() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              mb: 3
+              mb: 3,
             }}
           >
             <Box
@@ -130,17 +142,21 @@ export default function AdminLogin() {
                 alignItems: "center",
                 justifyContent: "center",
                 mb: 2,
-                boxShadow: "0 0 20px rgba(75, 0, 130, 0.5)"
+                boxShadow: "0 0 20px rgba(75, 0, 130, 0.5)",
               }}
             >
               <AdminPanelSettings sx={{ color: "white", fontSize: 30 }} />
             </Box>
-            <Typography component="h1" variant="h4" sx={{ 
-              fontWeight: 700, 
-              color: "white",
-              mb: 1,
-              textShadow: "0 0 10px rgba(75, 0, 130, 0.5)"
-            }}>
+            <Typography
+              component="h1"
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: "white",
+                mb: 1,
+                textShadow: "0 0 10px rgba(75, 0, 130, 0.5)",
+              }}
+            >
               Admin Portal
             </Typography>
             <Typography variant="body2" sx={{ color: "#a0a0d0" }}>
@@ -149,12 +165,15 @@ export default function AdminLogin() {
           </Box>
 
           {error && (
-            <Alert severity="error" sx={{ 
-              mb: 3, 
-              backgroundColor: "rgba(211, 47, 47, 0.2)",
-              color: "#ff8a8a",
-              border: "1px solid rgba(211, 47, 47, 0.3)"
-            }}>
+            <Alert
+              severity="error"
+              sx={{
+                mb: 3,
+                backgroundColor: "rgba(211, 47, 47, 0.2)",
+                color: "#ff8a8a",
+                border: "1px solid rgba(211, 47, 47, 0.3)",
+              }}
+            >
               {error}
             </Alert>
           )}
@@ -199,7 +218,7 @@ export default function AdminLogin() {
                 },
                 "& .MuiInputLabel-root.Mui-focused": {
                   color: "#7b68ee",
-                }
+                },
               }}
             />
             <TextField
@@ -227,7 +246,11 @@ export default function AdminLogin() {
                       edge="end"
                       sx={{ color: "#6a5acd" }}
                     >
-                      {formData.showPassword ? <VisibilityOff /> : <Visibility />}
+                      {formData.showPassword ? (
+                        <VisibilityOff />
+                      ) : (
+                        <Visibility />
+                      )}
                     </IconButton>
                   </InputAdornment>
                 ),
@@ -253,7 +276,7 @@ export default function AdminLogin() {
                 },
                 "& .MuiInputLabel-root.Mui-focused": {
                   color: "#7b68ee",
-                }
+                },
               }}
             />
             <Button
@@ -271,7 +294,8 @@ export default function AdminLogin() {
                 fontWeight: 600,
                 boxShadow: "0 4px 14px 0 rgba(75, 0, 130, 0.5)",
                 "&:hover": {
-                  background: "linear-gradient(90deg, #000080 0%, #4b0082 100%)",
+                  background:
+                    "linear-gradient(90deg, #000080 0%, #4b0082 100%)",
                   boxShadow: "0 6px 20px 0 rgba(75, 0, 130, 0.7)",
                   transform: "translateY(-1px)",
                 },
@@ -304,14 +328,24 @@ export default function AdminLogin() {
             </Box>
           </Box>
 
-          <Box sx={{ 
-            mt: 3, 
-            pt: 2, 
-            borderTop: "1px solid", 
-            borderColor: "rgba(75, 0, 130, 0.3)" 
-          }}>
-            <Typography variant="caption" display="block" align="center" sx={{ color: "#b0b0e0" }}>
-              <Link href="#" style={{ color: "#9370db", textDecoration: "none" }}>
+          <Box
+            sx={{
+              mt: 3,
+              pt: 2,
+              borderTop: "1px solid",
+              borderColor: "rgba(75, 0, 130, 0.3)",
+            }}
+          >
+            <Typography
+              variant="caption"
+              display="block"
+              align="center"
+              sx={{ color: "#b0b0e0" }}
+            >
+              <Link
+                href="#"
+                style={{ color: "#9370db", textDecoration: "none" }}
+              >
                 Forgot password?
               </Link>
             </Typography>
@@ -319,7 +353,11 @@ export default function AdminLogin() {
         </Paper>
 
         <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" align="center" sx={{ color: "rgba(80, 80, 120, 0.8)" }}>
+          <Typography
+            variant="body2"
+            align="center"
+            sx={{ color: "rgba(80, 80, 120, 0.8)" }}
+          >
             © 2024 SyncSphere. All rights reserved.
           </Typography>
         </Box>
