@@ -1,6 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
+import {
+  TextField,
+  Button,
+  Box,
+  Container,
+  Paper,
+  Alert,
+  CircularProgress,
+  Typography,
+  InputAdornment,
+  IconButton
+} from "@mui/material";
+import { Visibility, VisibilityOff, Lock, Person, Email } from "@mui/icons-material";
 
 export default function Register() {
   const nav = useNavigate();
@@ -8,13 +21,21 @@ export default function Register() {
   const [formData, setFormData] = useState({
     username: "",
     email: "",
-    password: ""
+    password: "",
+    showPassword: false
   });
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
+    });
+  };
+
+  const handleClickShowPassword = () => {
+    setFormData({
+      ...formData,
+      showPassword: !formData.showPassword
     });
   };
 
@@ -37,115 +58,318 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 relative overflow-hidden">
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-600 rounded-full blur-3xl opacity-20 animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gray-800 rounded-full blur-3xl opacity-20 animate-pulse delay-1000"></div>
-      </div>
-
-      <div className="relative z-10 min-h-screen flex items-center justify-center p-6">
-        <div className="bg-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md p-8 transform transition-all duration-300 hover:scale-[1.02]">
-          {/* Logo/Brand */}
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl mx-auto mb-4 flex items-center justify-center shadow-lg">
-              <span className="text-white text-2xl font-bold">S</span>
-            </div>
-            <h1 className="text-3xl font-bold text-white mb-2">Join SyncSphere</h1>
-            <p className="text-gray-400">Create your account to start chatting</p>
-          </div>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        background: "linear-gradient(135deg, #e6e6fa 0%, #d8bfd8 50%, #b0c4de 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        py: 4,
+        px: 2,
+        position: "relative",
+        overflow: "hidden",
+        "&::before": {
+          content: '""',
+          position: "absolute",
+          top: "-10%",
+          right: "-10%",
+          width: "300px",
+          height: "300px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(128, 0, 128, 0.15) 0%, transparent 70%)",
+          animation: "float 15s infinite ease-in-out",
+        },
+        "&::after": {
+          content: '""',
+          position: "absolute",
+          bottom: "-10%",
+          left: "-10%",
+          width: "400px",
+          height: "400px",
+          borderRadius: "50%",
+          background: "radial-gradient(circle, rgba(0, 0, 255, 0.1) 0%, transparent 70%)",
+          animation: "float 18s infinite ease-in-out reverse",
+        },
+        "@keyframes float": {
+          "0%, 100%": { transform: "translateY(0) rotate(0deg)" },
+          "50%": { transform: "translateY(-20px) rotate(5deg)" },
+        }
+      }}
+    >
+      <Container component="main" maxWidth="sm">
+        <Paper
+          elevation={24}
+          sx={{
+            p: 4,
+            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
+            borderRadius: 3,
+            backdropFilter: "blur(10px)",
+            border: "1px solid rgba(75, 0, 130, 0.5)",
+            color: "white",
+            position: "relative",
+            zIndex: 1,
+            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(75, 0, 130, 0.4)"
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              mb: 3
+            }}
+          >
+            <Box
+              sx={{
+                width: 70,
+                height: 70,
+                background: "linear-gradient(135deg, #4b0082 0%, #000080 100%)",
+                borderRadius: "50%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                mb: 2,
+                boxShadow: "0 0 20px rgba(75, 0, 130, 0.5)"
+              }}
+            >
+              <Lock sx={{ color: "white", fontSize: 30 }} />
+            </Box>
+            <Typography component="h1" variant="h4" sx={{ 
+              fontWeight: 700, 
+              color: "white",
+              mb: 1,
+              textShadow: "0 0 10px rgba(75, 0, 130, 0.5)"
+            }}>
+              Join SyncSphere
+            </Typography>
+            <Typography variant="body2" sx={{ color: "#a0a0d0" }}>
+              Create your account to start chatting
+            </Typography>
+          </Box>
 
           {error && (
-            <div className="mb-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
-              <p className="text-red-400 text-sm text-center">{error}</p>
-            </div>
+            <Alert severity="error" sx={{ 
+              mb: 3, 
+              backgroundColor: "rgba(211, 47, 47, 0.2)",
+              color: "#ff8a8a",
+              border: "1px solid rgba(211, 47, 47, 0.3)"
+            }}>
+              {error}
+            </Alert>
           )}
 
-          <form onSubmit={onSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Username</label>
-              <input 
-                name="username"
-                value={formData.username} 
-                onChange={handleChange} 
-                placeholder="Choose a username" 
-                className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                disabled={loading}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Email</label>
-              <input 
-                name="email"
-                type="email"
-                value={formData.email} 
-                onChange={handleChange} 
-                placeholder="Enter your email" 
-                className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                disabled={loading}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-gray-300">Password</label>
-              <input 
-                name="password"
-                type="password" 
-                value={formData.password} 
-                onChange={handleChange} 
-                placeholder="Create a password" 
-                className="w-full p-4 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 disabled:opacity-50"
-                disabled={loading}
-                required
-              />
-            </div>
-
-            <button 
-              type="submit"
-              className="w-full p-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl shadow-lg transform transition-all duration-200 hover:from-blue-500 hover:to-blue-600 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          <Box component="form" onSubmit={onSubmit} sx={{ mt: 1 }}>
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="username"
+              label="Username"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
               disabled={loading}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Person sx={{ color: "#6a5acd" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                mb: 2,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  backgroundColor: "rgba(40, 40, 70, 0.7)",
+                  color: "white",
+                  "& fieldset": {
+                    borderColor: "#6a5acd",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "#9370db",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "#7b68ee",
+                  },
+                },
+                "& .MuiInputLabel-root": {
+                  color: "#b0b0e0",
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: "#7b68ee",
+                }
+              }}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              id="email"
+              label="Email Address"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={loading}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Email sx={{ color: "#6a5acd" }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                mb: 2,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  backgroundColor: "rgba(40, 40, 70, 0.7)",
+                  color: "white",
+                  "& fieldset": {
+                    borderColor: "#6a5acd",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "#9370db",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "#7b68ee",
+                  },
+                },
+                "& .MuiInputLabel-root": {
+                  color: "#b0b0e0",
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: "#7b68ee",
+                }
+              }}
+            />
+            <TextField
+              margin="normal"
+              required
+              fullWidth
+              name="password"
+              label="Password"
+              type={formData.showPassword ? "text" : "password"}
+              id="password"
+              value={formData.password}
+              onChange={handleChange}
+              disabled={loading}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Lock sx={{ color: "#6a5acd" }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label="toggle password visibility"
+                      onClick={handleClickShowPassword}
+                      edge="end"
+                      sx={{ color: "#6a5acd" }}
+                    >
+                      {formData.showPassword ? <VisibilityOff /> : <Visibility />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                mb: 3,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: 2,
+                  backgroundColor: "rgba(40, 40, 70, 0.7)",
+                  color: "white",
+                  "& fieldset": {
+                    borderColor: "#6a5acd",
+                  },
+                  "&:hover fieldset": {
+                    borderColor: "#9370db",
+                  },
+                  "&.Mui-focused fieldset": {
+                    borderColor: "#7b68ee",
+                  },
+                },
+                "& .MuiInputLabel-root": {
+                  color: "#b0b0e0",
+                },
+                "& .MuiInputLabel-root.Mui-focused": {
+                  color: "#7b68ee",
+                }
+              }}
+            />
+            <Button
+              type="submit"
+              fullWidth
+              variant="contained"
+              disabled={loading}
+              sx={{
+                mt: 2,
+                mb: 2,
+                py: 1.5,
+                borderRadius: 2,
+                background: "linear-gradient(90deg, #4b0082 0%, #000080 100%)",
+                fontSize: "1rem",
+                fontWeight: 600,
+                boxShadow: "0 4px 14px 0 rgba(75, 0, 130, 0.5)",
+                "&:hover": {
+                  background: "linear-gradient(90deg, #000080 0%, #4b0082 100%)",
+                  boxShadow: "0 6px 20px 0 rgba(75, 0, 130, 0.7)",
+                  transform: "translateY(-1px)",
+                },
+                "&:active": {
+                  transform: "translateY(0)",
+                },
+                transition: "all 0.3s ease",
+              }}
             >
               {loading ? (
-                <div className="flex items-center justify-center">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Creating account...
-                </div>
+                <CircularProgress size={24} sx={{ color: "white" }} />
               ) : (
                 "Create Account"
               )}
-            </button>
-          </form>
+            </Button>
+            <Box sx={{ textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "#b0b0e0" }}>
+                Already have an account?{" "}
+                <Link
+                  to="/login"
+                  style={{
+                    color: "#9370db",
+                    textDecoration: "none",
+                    fontWeight: 600,
+                  }}
+                >
+                  Sign in
+                </Link>
+              </Typography>
+            </Box>
+          </Box>
 
-          <div className="mt-8 text-center">
-            <p className="text-gray-400">
-              Already have an account?{" "}
-              <Link
-                to="/login"
-                className="text-blue-400 hover:text-blue-300 font-semibold transition-colors duration-200"
-              >
-                Sign in
-              </Link>
-            </p>
-          </div>
-
-          {/* Terms & Privacy */}
-          <div className="mt-6 pt-6 border-t border-gray-700/50">
-            <p className="text-xs text-gray-500 text-center">
+          <Box sx={{ 
+            mt: 3, 
+            pt: 2, 
+            borderTop: "1px solid", 
+            borderColor: "rgba(75, 0, 130, 0.3)" 
+          }}>
+            <Typography variant="caption" display="block" align="center" sx={{ color: "#b0b0e0" }}>
               By creating an account, you agree to our{" "}
-              <button className="text-blue-400 hover:text-blue-300">Terms</button> and{" "}
-              <button className="text-blue-400 hover:text-blue-300">Privacy Policy</button>
-            </p>
-          </div>
-        </div>
-      </div>
+              <Link href="#" style={{ color: "#9370db", textDecoration: "none" }}>
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link href="#" style={{ color: "#9370db", textDecoration: "none" }}>
+                Privacy Policy
+              </Link>
+            </Typography>
+          </Box>
+        </Paper>
 
-      {/* Footer */}
-      <div className="absolute bottom-4 left-0 right-0 text-center">
-        <p className="text-gray-500 text-sm">© 2024 SyncSphere. All rights reserved.</p>
-      </div>
-    </div>
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="body2" align="center" sx={{ color: "rgba(80, 80, 120, 0.8)" }}>
+            © 2024 SyncSphere. All rights reserved.
+          </Typography>
+        </Box>
+      </Container>
+    </Box>
   );
 }
