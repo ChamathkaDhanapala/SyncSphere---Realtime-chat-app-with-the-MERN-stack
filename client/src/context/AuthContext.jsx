@@ -36,16 +36,22 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, isAdminLogin = false) => {
     try {
       setLoading(true);
       setError("");
       const { data } = await api.post("/auth/login", { email, password });
+      
+      // Check if admin login is required but user is not admin
+      if (isAdminLogin && !data.user.isAdmin) {
+        throw new Error("Admin privileges required");
+      }
+      
       saveAuth(data.user, data.token);
       return { success: true };
     } catch (error) {
       console.error("Login error:", error);
-      const errorMessage = error.response?.data?.message || "Login failed. Please try again.";
+      const errorMessage = error.response?.data?.message || error.message || "Login failed. Please try again.";
       setError(errorMessage);
       return { success: false, message: errorMessage };
     } finally {
