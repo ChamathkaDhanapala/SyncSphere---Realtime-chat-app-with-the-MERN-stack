@@ -8,10 +8,12 @@ import { Server } from "socket.io";
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";     
 import messageRoutes from "./routes/messageRoutes.js"; 
+import adminRoutes from "./routes/admin.js"; 
 import { connectDB } from "./config/db.js";
 import { setupSocket } from "./socket.js";
 import path from "path"; 
 import { fileURLToPath } from "url"; 
+import { protect } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -30,6 +32,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 5000;
 
+
 app.use(cors({
   origin: process.env.FRONTEND_URL || "http://localhost:3000",
   credentials: true
@@ -39,13 +42,15 @@ app.use(express.json());
 
 app.use("/uploads", (req, res, next) => {
   res.header('Access-Control-Allow-Origin', process.env.FRONTEND_URL || "http://localhost:3000");
-  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Allow-Credentials', 'true');
   next();
-}, express.static(path.join(__dirname, "../uploads")));
+}, express.static(path.join(__dirname, "uploads"))); 
 
-app.use("/api", authRoutes);
-app.use("/api/users", userRoutes);        
-app.use("/api/messages", messageRoutes);  
+
+app.use("/api/auth", authRoutes);
+app.use("/api/users", protect, userRoutes);       
+app.use("/api/messages", protect, messageRoutes); 
+app.use('/api/admin', protect, adminRoutes); 
 
 setupSocket(io);
 
