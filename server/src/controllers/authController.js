@@ -16,7 +16,7 @@ export async function register(req, res) {
     }
     
     const user = await User.create({ username, email, password });
-    const token = generateToken(user._id, process.env.JWT_SECRET);
+    const token = generateToken(user._id);
     
     const userWithoutPassword = user.toJSON();
     delete userWithoutPassword.password;
@@ -61,7 +61,7 @@ export async function login(req, res) {
     
     console.log("✅ Login successful for user:", user.email);
     
-    const token = generateToken(user._id, process.env.JWT_SECRET);
+    const token = generateToken(user._id);
     
     const userWithoutPassword = user.toJSON();
     delete userWithoutPassword.password;
