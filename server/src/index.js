@@ -46,6 +46,15 @@ app.use("/uploads", (req, res, next) => {
   next();
 }, express.static(path.join(__dirname, "uploads"))); 
 
+app.get("/api/test", (req, res) => {
+  console.log("✅ Test route hit!");
+  res.json({ message: "Server is working!", timestamp: new Date() });
+});
+
+app.post("/api/test-post", (req, res) => {
+  console.log("✅ Test POST route hit!", req.body);
+  res.json({ message: "POST is working!", data: req.body });
+});
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", protect, userRoutes);       
