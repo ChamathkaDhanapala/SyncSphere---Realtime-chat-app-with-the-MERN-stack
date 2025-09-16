@@ -39,8 +39,22 @@ const userSchema = new mongoose.Schema({
   lastSeen: { 
     type: Date, 
     default: null 
+  },
+  isAdmin: {
+    type: Boolean,
+    default: false
+  },
+  registeredAt: {
+    type: Date,
+    default: Date.now
+  },
+  lastActive: {
+    type: Date,
+    default: Date.now
   }
-}, { timestamps: true });
+}, { 
+  timestamps: true 
+});
 
 userSchema.pre("save", async function(next) {
   if (!this.isModified("password")) return next();
