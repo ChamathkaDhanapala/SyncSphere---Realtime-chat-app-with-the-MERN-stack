@@ -1,15 +1,19 @@
 import User from "../models/User.js";
 import path from "path";
 import fs from "fs";
+import bcrypt from "bcryptjs"; 
+import jwt from "jsonwebtoken"; 
 
 export async function listUsers(req, res) {
   try {
-    const users = await User.find({ _id: { $ne: req.user._id } }).select("-password").sort({ online: -1, username: 1 });
+    const users = await User.find({ _id: { $ne: req.user._id } })
+      .select("-password")
+      .sort({ online: -1, username: 1 });
     res.json(users);
   } catch (e) {
     res.status(500).json({ message: "Server error" });
   }
-};
+}
 
 export const updateProfile = async (req, res) => {
   try {
@@ -26,14 +30,13 @@ export const updateProfile = async (req, res) => {
 
       const existingUser = await User.findOne({
         username: username.trim(),
-        _id: { $ne: req.user._id }
+        _id: { $ne: req.user._id },
       });
 
       if (existingUser) {
         return res.status(400).json({ message: "Username already exists" });
       }
     }
-
 
     if (bio !== undefined) {
       updates.bio = bio;
@@ -51,7 +54,7 @@ export const updateProfile = async (req, res) => {
       { $set: updates },
       {
         new: true,
-        runValidators: true
+        runValidators: true,
       }
     ).select("-password");
 
@@ -66,20 +69,21 @@ export const updateProfile = async (req, res) => {
       username: user.username,
       email: user.email,
       bio: user.bio,
-      avatarUrl: user.avatarUrl ? `${user.avatarUrl}?t=${Date.now()}` : user.avatarUrl,
+      avatarUrl: user.avatarUrl
+        ? `${user.avatarUrl}?t=${Date.now()}`
+        : user.avatarUrl,
       online: user.online,
-      lastSeen: user.lastSeen
+      lastSeen: user.lastSeen,
     };
     res.json({
       message: "Profile updated successfully",
-      user: userResponse
+      user: userResponse,
     });
-
   } catch (error) {
     console.error("Profile update error:", error);
 
     if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map(val => val.message);
+      const errors = Object.values(error.errors).map((val) => val.message);
       return res.status(400).json({ message: "Validation error", errors });
     }
 
@@ -88,5 +92,48 @@ export const updateProfile = async (req, res) => {
     }
 
     res.status(500).json({ message: "Server error updating profile" });
+  }
+}; 
+
+export const registerUser = async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "User already exists" });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const user = new User({
+      username,
+      email,
+      password: hashedPassword,
+      isAdmin: false,
+      registeredAt: new Date(),
+      lastActive: new Date(),
+    });
+
+    await user.save();
+
+    const token = jwt.sign(
+      { userId: user._id, isAdmin: user.isAdmin },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        isAdmin: user.isAdmin,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };
