@@ -3,23 +3,22 @@ import User from "../models/User.js";
 
 export async function protect(req, res, next) {
   try {
-    const auth = req.headers.authorization || "";
-    const token = auth.startsWith("Bearer ") ? auth.split(" ")[1] : null;
+    const token = req.header('Authorization')?.replace('Bearer ', '');
     
     if (!token) {
-      return res.status(401).json({ message: "Not authorized, no token" });
+      return res.status(401).json({ message: 'No token, authorization denied' });
     }
-    
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {
-      return res.status(401).json({ message: "User not found" });
+      return res.status(401).json({ message: 'Token is not valid' });
     }
-    
+
     req.user = user;
     next();
-  } catch (e) {
-    return res.status(401).json({ message: "Not authorized" });
+  } catch (error) {
+    res.status(401).json({ message: 'Token is not valid' });
   }
 }
