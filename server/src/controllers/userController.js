@@ -1,8 +1,4 @@
 import User from "../models/User.js";
-import path from "path";
-import fs from "fs";
-import bcrypt from "bcryptjs"; 
-import jwt from "jsonwebtoken"; 
 
 export async function listUsers(req, res) {
   try {
@@ -93,47 +89,94 @@ export const updateProfile = async (req, res) => {
 
     res.status(500).json({ message: "Server error updating profile" });
   }
-}; 
+};
 
-export const registerUser = async (req, res) => {
+// Get all users for admin
+export const getAdminUsers = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const user = new User({
-      username,
-      email,
-      password: hashedPassword,
-      isAdmin: false,
-      registeredAt: new Date(),
-      lastActive: new Date(),
-    });
-
-    await user.save();
-
-    const token = jwt.sign(
-      { userId: user._id, isAdmin: user.isAdmin },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
-
-    res.status(201).json({
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        isAdmin: user.isAdmin,
-      },
+    console.log("Fetching all users for admin...");
+    
+    const users = await User.find().select('-password');
+    
+    console.log(`Found ${users.length} users`);
+    
+    res.json({
+      success: true,
+      users
     });
   } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
+    console.error('Get admin users error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error fetching users'
+    });
+  }
+};
+
+// Toggle user active status
+export const toggleUserStatus = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { isActive } = req.body;
+
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { isActive },
+      { new: true }
+    ).select('-password');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
+      user
+    });
+  } catch (error) {
+    console.error('Toggle user status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error updating user status'
+    });
+  }
+};
+
+// Delete user
+export const deleteUser = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // Prevent self-deletion
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cannot delete your own account'
+      });
+    }
+
+    const user = await User.findByIdAndDelete(userId);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'User deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error deleting user'
+    });
   }
 };
