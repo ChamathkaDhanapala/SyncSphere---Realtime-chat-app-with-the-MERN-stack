@@ -1,10 +1,10 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { api, setToken as setApiToken } from "../lib/api.js";
 
-const AuthCtx = createContext(null);
+const AuthContext = createContext(null); 
 
 export function useAuth() {
-  return useContext(AuthCtx);
+  return useContext(AuthContext);
 }
 
 export function AuthProvider({ children }) {
@@ -26,7 +26,7 @@ export function AuthProvider({ children }) {
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(""); 
 
   useEffect(() => {
     setApiToken(token);
@@ -35,7 +35,7 @@ export function AuthProvider({ children }) {
   const refreshMe = useCallback(async () => {
     if (!token) return;
     try {
-      const { data } = await api.get("/auth/me");
+      const { data } = await api.get("/api/auth/me");   
       setUser(data.user);
       localStorage.setItem("user", JSON.stringify(data.user));
     } catch (error) {
@@ -71,7 +71,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/auth/login", { email, password });
+      const { data } = await api.post("/api/auth/login", { email, password });  
 
       if (isAdminLogin && !data.user.isAdmin) {
         throw new Error("Admin privileges required");
@@ -94,7 +94,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/auth/register", { username, email, password });
+      const { data } = await api.post("/api/auth/register", { username, email, password }); 
       saveAuth(data.user, data.token);
       return { success: true };
     } catch (error) {
@@ -117,7 +117,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.put("/users/me", formData);
+      const { data } = await api.put("/api/users/me", formData); 
       setUser(data.user);
       localStorage.setItem("user", JSON.stringify(data.user));
       return data;
@@ -132,11 +132,13 @@ export function AuthProvider({ children }) {
     }
   };
 
+  
   const value = {
     user,
     token,
     loading,
     error,
+    setError, 
     login,
     register,
     logout,
@@ -144,5 +146,9 @@ export function AuthProvider({ children }) {
     updateProfile,
   };
 
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
