@@ -4,9 +4,8 @@ import Register from "./pages/Register.jsx";
 import Chat from "./pages/Chat.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { SocketProvider } from "./context/SocketProvider.jsx";
-import AdminLogin from "./pages/AdminLogin.jsx";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminRoute from "./components/AdminRoute.jsx";
+import AdminDashboard from "./components/AdminDashboard.jsx";
+import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
@@ -29,14 +28,13 @@ export default function App() {
             />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/adminlogin" element={<AdminLogin />} />
-            <Route
-              path="/admin/dashboard"
+            <Route 
+              path="/admin/dashboard" 
               element={
-                <AdminRoute>
+                <ProtectedAdminRoute>
                   <AdminDashboard />
-                </AdminRoute>
-              }
+                </ProtectedAdminRoute>
+              } 
             />
           </Routes>
         </BrowserRouter>
