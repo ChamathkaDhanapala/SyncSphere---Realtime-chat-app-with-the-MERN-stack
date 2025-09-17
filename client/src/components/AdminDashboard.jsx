@@ -16,7 +16,7 @@ import {
   Chip,
   Alert,
   CircularProgress,
-  TextField // Added missing import
+  TextField 
 } from '@mui/material';
 
 export default function AdminDashboard() {
@@ -24,7 +24,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState(''); // Moved to top
+  const [searchTerm, setSearchTerm] = useState(''); 
 
   useEffect(() => {
     if (user?.isAdmin) {
@@ -78,7 +78,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // Filter users based on search term
   const filteredUsers = users.filter(user => 
     user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
     user.email.toLowerCase().includes(searchTerm.toLowerCase())
