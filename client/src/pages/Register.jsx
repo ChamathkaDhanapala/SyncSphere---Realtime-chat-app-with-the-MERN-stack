@@ -17,19 +17,23 @@ import { Visibility, VisibilityOff, Lock, Person, Email } from "@mui/icons-mater
 
 export default function Register() {
   const nav = useNavigate();
-  const { register, loading, error } = useAuth();
+  const { register, loading, error, setError } = useAuth(); 
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
     showPassword: false
   });
+  const [localError, setLocalError] = useState(""); 
 
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+    
+    if (error) setError("");
+    if (localError) setLocalError("");
   };
 
   const handleClickShowPassword = () => {
@@ -42,20 +46,49 @@ export default function Register() {
   const onSubmit = async (e) => {
     e.preventDefault();
     
+ 
+    if (setError) setError("");
+    setLocalError("");
+    
+    
     if (!formData.username || !formData.email || !formData.password) {
+      const errorMsg = "All fields are required";
+      if (setError) setError(errorMsg);
+      else setLocalError(errorMsg);
+      return;
+    }
+    
+    if (formData.password.length < 6) {
+      const errorMsg = "Password must be at least 6 characters";
+      if (setError) setError(errorMsg);
+      else setLocalError(errorMsg);
+      return;
+    }
+    
+  
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      const errorMsg = "Please enter a valid email address";
+      if (setError) setError(errorMsg);
+      else setLocalError(errorMsg);
       return;
     }
     
     try {
       const result = await register(formData.username, formData.email, formData.password);
       
-      if (result.success) {
-        nav("/"); 
+      if (result && result.success) {
+        nav("/");
       }
     } catch (e) {
       console.error("Registration error:", e);
+      const errorMsg = "Registration failed. Please try again.";
+      if (setError) setError(errorMsg);
+      else setLocalError(errorMsg);
     }
   };
+
+  const displayError = error || localError;
 
   return (
     <Box
@@ -148,14 +181,14 @@ export default function Register() {
             </Typography>
           </Box>
 
-          {error && (
+          {displayError && (
             <Alert severity="error" sx={{ 
               mb: 3, 
               backgroundColor: "rgba(211, 47, 47, 0.2)",
               color: "#ff8a8a",
               border: "1px solid rgba(211, 47, 47, 0.3)"
             }}>
-              {error}
+              {displayError}
             </Alert>
           )}
 
