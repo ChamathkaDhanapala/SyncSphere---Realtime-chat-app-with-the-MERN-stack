@@ -4,7 +4,7 @@ import Avatar from "./Avatar.jsx";
 import EditProfileModal from "./EditProfileModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
-import { useNavigate } from "react-router-dom";
+import {  Link } from "react-router-dom";
 import { AdminPanelSettings } from "@mui/icons-material";
 
 export default function Sidebar({ onSelect, selectedId }) {
@@ -14,11 +14,11 @@ export default function Sidebar({ onSelect, selectedId }) {
   const { user, logout, refreshMe } = useAuth();
   const { isOnline } = useSocket();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const navigate = useNavigate();
+  //const navigate = useNavigate();
 
   useEffect(() => {
     refreshMe();
-    api.get("/users").then(({ data }) => setUsers(data));
+    api.get("/api/users").then(({ data }) => setUsers(data.users || data));
   }, [refreshMe, refreshTrigger]);
 
   const filteredUsers = users.filter(u =>
@@ -61,20 +61,21 @@ export default function Sidebar({ onSelect, selectedId }) {
           title="Logout"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 0 013-3h4a3 3 0 013 3v1" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 极l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </button>
       </div>
 
       {/* Admin Dashboard Link (only for admin users) */}
       {user && user.isAdmin && (
-        <div 
+        <Link 
+          to="/admin/dashboard"
           className="px-4 py-3 flex items-center gap-3 border-b border-gray-700/50 cursor-pointer text-blue-400 hover:bg-gray-700/50 transition-all duration-200"
-          onClick={() => navigate('/admin/dashboard')}
+          title="Access admin management panel"
         >
           <AdminPanelSettings className="text-blue-400" />
           <span className="font-medium">Admin Dashboard</span>
-        </div>
+        </Link>
       )}
 
       {/* Search Bar */}
@@ -82,7 +83,7 @@ export default function Sidebar({ onSelect, selectedId }) {
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-极6m2-5a7 7 极 11-14 0 7 7 0 0114 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
           <input
@@ -105,7 +106,7 @@ export default function Sidebar({ onSelect, selectedId }) {
       </div>
 
       {/* Users List */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-极 overflow-y-auto">
         {filteredUsers.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-gray-400 mb-2">No users found</div>
@@ -153,7 +154,7 @@ export default function Sidebar({ onSelect, selectedId }) {
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-400">Connection</span>
           <span className="text-green-400 flex items-center">
-            <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+            <span className="w-2 h-2 bg-green-400极 rounded-full mr-1"></span>
             Connected
           </span>
         </div>
