@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { api } from '../lib/api';
+import { useState, useEffect } from "react";
 import {
   Box,
   Container,
@@ -16,30 +14,47 @@ import {
   Chip,
   Alert,
   CircularProgress,
-  TextField 
-} from '@mui/material';
+  TextField,
+} from "@mui/material";
+import { useAuth } from "../context/AuthContext";
+import { api } from "../lib/api";
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [searchTerm, setSearchTerm] = useState(''); 
+  const [error, setError] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    if (user?.isAdmin) {
-      fetchUsers();
-    }
+    if (user?.isAdmin) fetchUsers();
   }, [user]);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const { data } = await api.get('/api/users/admin');
-      setUsers(data.users);
-    } catch (error) {
-      setError('Failed to fetch users');
-      console.error('Error fetching users:', error);
+      setError("");
+      console.log("🔄 Fetching users from /users/admin");
+      
+      const response = await api.get("/users/admin");
+      console.log("✅ Users fetched successfully:", response.data);
+      
+      // Handle different response formats
+      if (response.data && response.data.users) {
+        setUsers(response.data.users);
+      } else if (Array.isArray(response.data)) {
+        setUsers(response.data);
+      } else {
+        console.error("❌ Unexpected response format:", response.data);
+        setError("Unexpected response format from server");
+      }
+    } catch (err) {
+      console.error("❌ Fetch users error:", err);
+      const errorMessage = err.response?.data?.message || 
+                          err.response?.data?.error ||
+                          err.message || 
+                          "Failed to fetch users";
+      setError("Failed to fetch users: " + errorMessage);
     } finally {
       setLoading(false);
     }
@@ -47,40 +62,50 @@ export default function AdminDashboard() {
 
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
-      await api.put(`/api/users/admin/${userId}/status`, {
-        isActive: !currentStatus
+      console.log(`🔄 Toggling status for user ${userId}`);
+      await api.put(`/users/admin/${userId}/status`, {
+        isActive: !currentStatus,
       });
       fetchUsers();
-    } catch (error) {
-      setError('Failed to update user status');
+    } catch (err) {
+      console.error("❌ Status update error:", err);
+      const errorMessage = err.response?.data?.message || "Failed to update user status";
+      setError(errorMessage);
     }
   };
 
-  const makeAdmin = async (userId, currentStatus) => {
+  const toggleAdminStatus = async (userId, currentStatus) => {
     try {
-      await api.put(`/api/users/admin/${userId}/admin`, {
-        isAdmin: !currentStatus
+      console.log(`🔄 Toggling admin status for user ${userId}`);
+      await api.put(`/users/admin/${userId}/admin`, {
+        isAdmin: !currentStatus,
       });
       fetchUsers();
-    } catch (error) {
-      setError('Failed to update admin status');
+    } catch (err) {
+      console.error("❌ Admin update error:", err);
+      const errorMessage = err.response?.data?.message || "Failed to update admin status";
+      setError(errorMessage);
     }
   };
 
   const deleteUser = async (userId) => {
-    if (!window.confirm('Are you sure you want to delete this user?')) return;
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
     
     try {
-      await api.delete(`/api/users/admin/${userId}`);
+      console.log(`🔄 Deleting user ${userId}`);
+      await api.delete(`/users/admin/${userId}`);
       fetchUsers();
-    } catch (error) {
-      setError('Failed to delete user');
+    } catch (err) {
+      console.error("❌ Delete error:", err);
+      const errorMessage = err.response?.data?.message || "Failed to delete user";
+      setError(errorMessage);
     }
   };
 
-  const filteredUsers = users.filter(user => 
-    user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredUsers = users.filter(
+    (u) =>
+      u.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (!user?.isAdmin) {
@@ -103,18 +128,17 @@ export default function AdminDashboard() {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
+      <Typography variant="h4" gutterBottom>
         Admin Dashboard
       </Typography>
-      
+
       {error && (
-        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
 
-      {/* Search and Refresh Controls */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+      <Box sx={{ display: "flex", gap: 2, mb: 3 }}>
         <TextField
           label="Search users"
           variant="outlined"
@@ -122,15 +146,12 @@ export default function AdminDashboard() {
           onChange={(e) => setSearchTerm(e.target.value)}
           sx={{ width: 300 }}
         />
-        <Button 
-          onClick={fetchUsers} 
-          variant="outlined"
-        >
+        <Button onClick={fetchUsers} variant="outlined">
           Refresh
         </Button>
       </Box>
 
-      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+      <Paper sx={{ width: "100%", overflow: "hidden" }}>
         <TableContainer sx={{ maxHeight: 440 }}>
           <Table stickyHeader aria-label="users table">
             <TableHead>
@@ -143,43 +164,43 @@ export default function AdminDashboard() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {filteredUsers.map((user) => (
-                <TableRow key={user._id}>
-                  <TableCell>{user.username}</TableCell>
-                  <TableCell>{user.email}</TableCell>
+              {filteredUsers.map((u) => (
+                <TableRow key={u._id}>
+                  <TableCell>{u.username}</TableCell>
+                  <TableCell>{u.email}</TableCell>
                   <TableCell>
                     <Chip
-                      label={user.isActive ? 'Active' : 'Inactive'}
-                      color={user.isActive ? 'success' : 'error'}
+                      label={u.isActive ? "Active" : "Inactive"}
+                      color={u.isActive ? "success" : "error"}
                     />
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={user.isAdmin ? 'Admin' : 'User'}
-                      color={user.isAdmin ? 'primary' : 'default'}
+                      label={u.isAdmin ? "Admin" : "User"}
+                      color={u.isAdmin ? "primary" : "default"}
                     />
                   </TableCell>
                   <TableCell>
                     <Button
                       size="small"
-                      color={user.isActive ? 'warning' : 'success'}
-                      onClick={() => toggleUserStatus(user._id, user.isActive)}
+                      color={u.isActive ? "warning" : "success"}
+                      onClick={() => toggleUserStatus(u._id, u.isActive)}
                       sx={{ mr: 1 }}
                     >
-                      {user.isActive ? 'Deactivate' : 'Activate'}
+                      {u.isActive ? "Deactivate" : "Activate"}
                     </Button>
                     <Button
                       size="small"
-                      color={user.isAdmin ? 'secondary' : 'primary'}
-                      onClick={() => makeAdmin(user._id, user.isAdmin)}
+                      color={u.isAdmin ? "secondary" : "primary"}
+                      onClick={() => toggleAdminStatus(u._id, u.isAdmin)}
                       sx={{ mr: 1 }}
                     >
-                      {user.isAdmin ? 'Remove Admin' : 'Make Admin'}
+                      {u.isAdmin ? "Remove Admin" : "Make Admin"}
                     </Button>
                     <Button
                       size="small"
                       color="error"
-                      onClick={() => deleteUser(user._id)}
+                      onClick={() => deleteUser(u._id)}
                     >
                       Delete
                     </Button>
