@@ -5,6 +5,19 @@ import MessageInput from "../components/MessageInput.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
 import { api } from "../lib/api.js";
+import {
+  Box,
+  Paper,
+  Typography,
+  Avatar,
+  Chip,
+  alpha
+} from "@mui/material";
+import {
+  Chat as ChatIcon,
+  Circle,
+  Wifi
+} from "@mui/icons-material";
 
 export default function Chat() {
   const { user } = useAuth();
@@ -12,7 +25,7 @@ export default function Chat() {
   const [peer, setPeer] = useState(null);
   const [messages, setMessages] = useState([]);
 
-  useEffect(()=>{
+  useEffect(() => {
     if (!socket) return;
     const onNew = ({ message }) => {
       if ((peer && [user._id, peer._id].includes(message.sender)) || !peer) {
@@ -43,82 +56,251 @@ export default function Chat() {
   };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 overflow-hidden">
+    <Box
+      sx={{
+        height: "100vh",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
+        overflow: "hidden",
+        position: "relative"
+      }}
+    >
       {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-60 h-60 bg-blue-600 rounded-full blur-3xl opacity-10 animate-pulse"></div>
-        <div className="absolute -bottom-20 -left-20 w-60 h-60 bg-gray-800 rounded-full blur-3xl opacity-10 animate-pulse delay-1000"></div>
-      </div>
+      <Box
+        sx={{
+          position: "absolute",
+          inset: 0,
+          overflow: "hidden",
+          "&::before, &::after": {
+            content: '""',
+            position: "absolute",
+            borderRadius: "50%",
+            filter: "blur(40px)",
+            opacity: 0.1,
+            animation: "pulse 4s ease-in-out infinite"
+          },
+          "&::before": {
+            top: -80,
+            right: -80,
+            width: 240,
+            height: 240,
+            background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+            animationDelay: "0s"
+          },
+          "&::after": {
+            bottom: -80,
+            left: -80,
+            width: 240,
+            height: 240,
+            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
+            animationDelay: "2s"
+          },
+          "@keyframes pulse": {
+            "0%, 100%": { opacity: 0.1 },
+            "50%": { opacity: 0.15 }
+          }
+        }}
+      />
 
-      <div className="relative z-10 h-screen flex">
-        {/* Sidebar - Made more visible */}
-        <div className="w-80 bg-gray-800/90 backdrop-blur-xl border-r border-gray-700/50 shadow-2xl">
+      <Box
+        sx={{
+          position: "relative",
+          zIndex: 10,
+          height: "100vh",
+          display: "flex"
+        }}
+      >
+        {/* Sidebar */}
+        <Box
+          sx={{
+            width: 320,
+            background: "linear-gradient(135deg, rgba(26, 31, 59, 0.95) 0%, rgba(45, 27, 78, 0.95) 100%)",
+            backdropFilter: "blur(20px)",
+            borderRight: "1px solid",
+            borderColor: alpha("#fff", 0.1),
+            boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)"
+          }}
+        >
           <Sidebar onSelect={selectPeer} selectedId={peer?._id} />
-        </div>
+        </Box>
         
         {/* Main Chat Area */}
-        <div className="flex-1 flex flex-col">
+        <Box
+          sx={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            background: alpha("#000", 0.2)
+          }}
+        >
           {peer ? (
             <>
               {/* Chat Header */}
-              <div className="bg-gray-800/80 border-b border-gray-700/50 px-6 py-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center">
-                    <span className="text-white font-semibold">
-                      {peer.username?.charAt(0)?.toUpperCase()}
-                    </span>
-                  </div>
-                  <div>
-                    <h2 className="text-white font-semibold">{peer.username}</h2>
-                    <p className="text-gray-300 text-sm"> 
-                      {peer.online ? (
-                        <span className="flex items-center">
-                          <span className="w-2 h-2 bg-green-400 rounded-full mr-2"></span>
-                          Online
-                        </span>
-                      ) : (
-                        <span className="text-gray-400"> 
-                          Offline
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                </div>
-              </div>
+              <Paper
+                elevation={0}
+                sx={{
+                  px: 4,
+                  py: 3,
+                  background: "linear-gradient(135deg, rgba(26, 31, 59, 0.95) 0%, rgba(45, 27, 78, 0.95) 100%)",
+                  backdropFilter: "blur(20px)",
+                  borderBottom: "1px solid",
+                  borderColor: alpha("#fff", 0.1),
+                  borderRadius: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 2
+                }}
+              >
+                <Box sx={{ position: "relative" }}>
+                  <Avatar
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      bgcolor: "primary.main",
+                      fontSize: "1.2rem",
+                      fontWeight: 600
+                    }}
+                  >
+                    {peer.username?.charAt(0)?.toUpperCase()}
+                  </Avatar>
+                  {peer.online && (
+                    <Circle
+                      sx={{
+                        position: "absolute",
+                        bottom: 0,
+                        right: 0,
+                        fontSize: "12px",
+                        color: "#38a169",
+                        bgcolor: "white",
+                        borderRadius: "50%",
+                        filter: "drop-shadow(0 0 2px #38a169)"
+                      }}
+                    />
+                  )}
+                </Box>
+                
+                <Box>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      color: "white",
+                      fontWeight: 600,
+                      fontSize: "1.1rem"
+                    }}
+                  >
+                    {peer.username}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: peer.online ? "#38a169" : alpha("#fff", 0.6),
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 0.5
+                    }}
+                  >
+                    <Circle sx={{ fontSize: "8px" }} />
+                    {peer.online ? "Online" : "Offline"}
+                  </Typography>
+                </Box>
+              </Paper>
 
               {/* Chat Window */}
-              <div className="flex-1 overflow-hidden bg-gray-900/50">
+              <Box sx={{ flex: 1, overflow: "hidden" }}>
                 <ChatWindow me={user} peer={peer} messages={messages} />
-              </div>
+              </Box>
 
               {/* Message Input */}
-              <div className="bg-gray-800/80 border-t border-gray-700/50 p-4">
+              <Box
+                sx={{
+                  background: "linear-gradient(135deg, rgba(26, 31, 59, 0.95) 0%, rgba(45, 27, 78, 0.95) 100%)",
+                  backdropFilter: "blur(20px)",
+                  borderTop: "1px solid",
+                  borderColor: alpha("#fff", 0.1)
+                }}
+              >
                 <MessageInput onSend={send} />
-              </div>
+              </Box>
             </>
           ) : (
-            <div className="h-full grid place-items-center bg-gray-900/40">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl mx-auto mb-6 flex items-center justify-center shadow-lg">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Welcome to SyncSphere</h3>
-                <p className="text-gray-300 mb-1">Select a contact to start chatting</p> 
-              </div>
-            </div>
+            <Box
+              sx={{
+                height: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: alpha("#000", 0.1),
+                backdropFilter: "blur(10px)"
+              }}
+            >
+              <Box sx={{ textAlign: "center" }}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    width: 100,
+                    height: 100,
+                    background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                    borderRadius: 3,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    mx: "auto",
+                    mb: 4,
+                    boxShadow: "0 8px 32px rgba(59, 130, 246, 0.3)"
+                  }}
+                >
+                  <ChatIcon sx={{ fontSize: 40, color: "white" }} />
+                </Paper>
+                <Typography
+                  variant="h5"
+                  sx={{
+                    color: "white",
+                    fontWeight: 700,
+                    mb: 1,
+                    fontSize: "1.5rem"
+                  }}
+                >
+                  Welcome to SyncSphere
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: alpha("#fff", 0.7),
+                    mb: 0.5
+                  }}
+                >
+                  Select a contact to start chatting
+                </Typography>
+              </Box>
+            </Box>
           )}
-        </div>
-      </div>
+        </Box>
+      </Box>
 
       {/* Status Bar */}
-      <div className="fixed bottom-4 left-4 z-20">
-        <div className="flex items-center space-x-2 bg-gray-800/80 backdrop-blur-xl px-3 py-2 rounded-xl border border-gray-700/50">
-          <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-          <span className="text-sm text-gray-200">Connected</span> 
-        </div>
-      </div>
-    </div>
+      <Box
+        sx={{
+          position: "fixed",
+          bottom: 16,
+          left: 16,
+          zIndex: 20
+        }}
+      >
+        <Chip
+          icon={<Wifi sx={{ fontSize: 16, color: "#38a169" }} />}
+          label="Connected"
+          sx={{
+            background: alpha("#1a1f3b", 0.9),
+            backdropFilter: "blur(20px)",
+            border: "1px solid",
+            borderColor: alpha("#fff", 0.1),
+            color: "#38a169",
+            fontWeight: 600,
+            "& .MuiChip-icon": {
+              color: "#38a169 !important"
+            }
+          }}
+        />
+      </Box>
+    </Box>
   );
 }
