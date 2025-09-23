@@ -4,7 +4,7 @@ import Avatar from "./Avatar.jsx";
 import EditProfileModal from "./EditProfileModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
-import {  Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { AdminPanelSettings } from "@mui/icons-material";
 
 export default function Sidebar({ onSelect, selectedId }) {
@@ -14,15 +14,35 @@ export default function Sidebar({ onSelect, selectedId }) {
   const { user, logout, refreshMe } = useAuth();
   const { isOnline } = useSocket();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  //const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        console.log("🔄 Fetching users...");
+        
+        const response = await api.get("/users");
+        console.log("📋 Users API response:", response);
+        
+        setUsers(response.data.users || response.data || []);
+        console.log("✅ Users loaded:", response.data.users?.length || response.data?.length);
+      } catch (error) {
+        console.error("❌ Error fetching users:", error);
+        setError("Failed to load users");
+      } finally {
+        setLoading(false);
+      }
+    };
+
     refreshMe();
-    api.get("/api/users").then(({ data }) => setUsers(data.users || data));
+    fetchUsers();
   }, [refreshMe, refreshTrigger]);
 
   const filteredUsers = users.filter(u =>
-    u.username.toLowerCase().includes(searchQuery.toLowerCase())
+    u.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleProfileUpdated = () => {
@@ -30,12 +50,34 @@ export default function Sidebar({ onSelect, selectedId }) {
     refreshMe();
   };
 
-  console.log("Current user avatarUrl:", user?.avatarUrl);
-  console.log("All users:", users.map(u => ({
-    username: u.username,
-    avatarUrl: u.avatarUrl,
-    _id: u._id
-  })));
+  console.log("Current user:", user);
+  console.log("All users:", users);
+
+  if (loading) {
+    return (
+      <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-white">Loading users...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
+        <div className="flex items-center justify-center h-full flex-col gap-2">
+          <div className="text-red-400">{error}</div>
+          <button 
+            onClick={() => setRefreshTrigger(prev => prev + 1)}
+            className="px-3 py-1.5 rounded-xl bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 transition-all duration-200"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
@@ -61,7 +103,7 @@ export default function Sidebar({ onSelect, selectedId }) {
           title="Logout"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 极l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 0 013-3h4a3 3 0 013 3v1" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
         </button>
       </div>
@@ -106,11 +148,15 @@ export default function Sidebar({ onSelect, selectedId }) {
       </div>
 
       {/* Users List */}
-      <div className="flex-极 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         {filteredUsers.length === 0 ? (
           <div className="text-center py-8">
-            <div className="text-gray-400 mb-2">No users found</div>
-            <div className="text-gray-500 text-sm">Try a different search term</div>
+            <div className="text-gray-400 mb-2">
+              {users.length === 0 ? "No users found" : "No matching users"}
+            </div>
+            <div className="text-gray-500 text-sm">
+              {users.length === 0 ? "The users list is empty" : "Try a different search term"}
+            </div>
           </div>
         ) : (
           filteredUsers.map(u => (
@@ -154,7 +200,7 @@ export default function Sidebar({ onSelect, selectedId }) {
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-400">Connection</span>
           <span className="text-green-400 flex items-center">
-            <span className="w-2 h-2 bg-green-400极 rounded-full mr-1"></span>
+            <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
             Connected
           </span>
         </div>
