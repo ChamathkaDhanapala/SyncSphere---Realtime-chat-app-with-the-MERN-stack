@@ -57,8 +57,7 @@ app.post("/api/test-post", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", protect, userRoutes);       
-app.use("/api/messages", protect, messageRoutes); 
-app.use('/api/admin', protect, adminRoutes); 
+app.use("/api/messages", protect, messageRoutes);  
 
 setupSocket(io);
 
