@@ -1,7 +1,13 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { api, setToken as setApiToken } from "../lib/api.js";
 
-const AuthContext = createContext(null); 
+const AuthContext = createContext(null);
 
 export function useAuth() {
   return useContext(AuthContext);
@@ -26,7 +32,7 @@ export function AuthProvider({ children }) {
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(""); 
+  const [error, setError] = useState("");
 
   useEffect(() => {
     setApiToken(token);
@@ -35,7 +41,7 @@ export function AuthProvider({ children }) {
   const refreshMe = useCallback(async () => {
     if (!token) return;
     try {
-      const { data } = await api.get("/api/auth/me");   
+      const { data } = await api.get("/api/auth/me");
       setUser(data.user);
       localStorage.setItem("user", JSON.stringify(data.user));
     } catch (error) {
@@ -71,7 +77,7 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/api/auth/login", { email, password });  
+      const { data } = await api.post("/api/auth/login", { email, password });
 
       if (isAdminLogin && !data.user.isAdmin) {
         throw new Error("Admin privileges required");
@@ -82,7 +88,9 @@ export function AuthProvider({ children }) {
     } catch (error) {
       console.error("Login error:", error);
       const errorMessage =
-        error.response?.data?.message || error.message || "Login failed. Please try again.";
+        error.response?.data?.message ||
+        error.message ||
+        "Login failed. Please try again.";
       setError(errorMessage);
       return { success: false, message: errorMessage };
     } finally {
@@ -94,13 +102,18 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/api/auth/register", { username, email, password }); 
+      const { data } = await api.post("/api/auth/register", {
+        username,
+        email,
+        password,
+      });
       saveAuth(data.user, data.token);
       return { success: true };
     } catch (error) {
       console.error("Registration error:", error);
       const errorMessage =
-        error.response?.data?.message || "Registration failed. Please try again.";
+        error.response?.data?.message ||
+        "Registration failed. Please try again.";
       setError(errorMessage);
       return { success: false, message: errorMessage };
     } finally {
@@ -115,30 +128,40 @@ export function AuthProvider({ children }) {
 
   const updateProfile = async (formData) => {
     try {
-      setLoading(true);
-      setError("");
-      const { data } = await api.put("/api/users/me", formData); 
-      setUser(data.user);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      return data;
+      console.log("🔄 Updating profile...");
+
+      const token = localStorage.getItem("token");
+      console.log("🔑 Token exists:", !!token);
+
+      const response = await api.put("/users/me", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      console.log("✅ Profile update response:", response);
+
+      if (response.data.success) {
+        setUser(response.data.user);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        console.log("✅ Profile updated successfully");
+        return response.data;
+      }
     } catch (error) {
-      console.error("Update profile error:", error);
-      const errorMessage =
-        error.response?.data?.message || "Failed to update profile. Please try again.";
-      setError(errorMessage);
+      console.error("❌ Profile update failed:", error);
+      console.error("❌ Error status:", error.response?.status);
+      console.error("❌ Error data:", error.response?.data);
+      console.error("❌ Error message:", error.message);
       throw error;
-    } finally {
-      setLoading(false);
     }
   };
 
-  
   const value = {
     user,
     token,
     loading,
     error,
-    setError, 
+    setError,
     login,
     register,
     logout,
@@ -146,9 +169,5 @@ export function AuthProvider({ children }) {
     updateProfile,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
