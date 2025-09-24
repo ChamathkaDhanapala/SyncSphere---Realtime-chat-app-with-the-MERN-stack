@@ -5,7 +5,7 @@ import Chat from "./pages/Chat.jsx";
 import { AuthProvider, useAuth } from "./context/AuthContext.jsx";
 import { SocketProvider } from "./context/SocketProvider.jsx";
 import AdminDashboard from "./components/AdminDashboard.jsx";
-import ProtectedAdminRoute from './components/ProtectedAdminRoute';
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
 
 function PrivateRoute({ children }) {
   const { token } = useAuth();
@@ -14,9 +14,9 @@ function PrivateRoute({ children }) {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <SocketProvider>
-        <BrowserRouter>
+    <BrowserRouter>
+      <AuthProvider>
+        <SocketProvider>
           <Routes>
             <Route
               path="/"
@@ -28,17 +28,17 @@ export default function App() {
             />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route 
-              path="/admin/dashboard" 
+            <Route
+              path="/admin/dashboard"
               element={
                 <ProtectedAdminRoute>
                   <AdminDashboard />
                 </ProtectedAdminRoute>
-              } 
+              }
             />
           </Routes>
-        </BrowserRouter>
-      </SocketProvider>
-    </AuthProvider>
+        </SocketProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }
