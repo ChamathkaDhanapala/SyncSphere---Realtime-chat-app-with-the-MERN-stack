@@ -1,9 +1,15 @@
 import mongoose from "mongoose";
-const { Schema } = mongoose;
 
-const conversationSchema = new Schema({
-  participants: [{ type: Schema.Types.ObjectId, ref: "User", required: true }],
-  latestMessage: { type: Schema.Types.ObjectId, ref: "Message" }
+const conversationSchema = new mongoose.Schema({
+  participants: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  }],
+  latestMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  }
 }, { timestamps: true });
 
 export default mongoose.model("Conversation", conversationSchema);
