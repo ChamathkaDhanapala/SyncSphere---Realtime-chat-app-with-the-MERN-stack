@@ -1,11 +1,80 @@
 import { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
-import Avatar from "./Avatar.jsx";
 import EditProfileModal from "./EditProfileModal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
 import { Link } from "react-router-dom";
-import { AdminPanelSettings } from "@mui/icons-material";
+
+const SimpleAvatar = ({ user, online, size = 40 }) => {
+  const [imageError, setImageError] = useState(false);
+
+  const getAvatarUrl = () => {
+    if (!user?.avatarUrl) return null;
+    
+    let avatarUrl = user.avatarUrl;
+    
+    if (!avatarUrl.startsWith('http')) {
+      avatarUrl = `http://localhost:5000${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
+    } else if (avatarUrl.includes('localhost:3000')) {
+      avatarUrl = avatarUrl.replace('localhost:3000', 'localhost:5000');
+    }
+    
+    return avatarUrl;
+  };
+
+  const avatarUrl = getAvatarUrl();
+
+  return (
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      {avatarUrl && !imageError ? (
+        <img
+          src={avatarUrl}
+          alt={user?.username}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            objectFit: 'cover',
+            border: '2px solid #374151'
+          }}
+          onError={() => setImageError(true)}
+        />
+      ) : (
+        <div 
+          style={{
+            width: size,
+            height: size,
+            borderRadius: '50%',
+            backgroundColor: '#4b5563',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: size * 0.4,
+            border: '2px solid #374151'
+          }}
+        >
+          {user?.username?.charAt(0)?.toUpperCase() || 'U'}
+        </div>
+      )}
+      {online && (
+        <div 
+          style={{
+            position: 'absolute',
+            bottom: 2,
+            right: 2,
+            width: 12,
+            height: 12,
+            backgroundColor: '#10b981',
+            border: '2px solid #1f2937',
+            borderRadius: '50%'
+          }}
+        />
+      )}
+    </div>
+  );
+};
 
 export default function Sidebar({ onSelect, selectedId }) {
   const [users, setUsers] = useState([]);
@@ -22,15 +91,10 @@ export default function Sidebar({ onSelect, selectedId }) {
       try {
         setLoading(true);
         setError(null);
-        console.log("🔄 Fetching users...");
-        
         const response = await api.get("/users");
-        console.log("📋 Users API response:", response);
-        
         setUsers(response.data.users || response.data || []);
-        console.log("✅ Users loaded:", response.data.users?.length || response.data?.length);
       } catch (error) {
-        console.error("❌ Error fetching users:", error);
+        console.error("Error fetching users:", error);
         setError("Failed to load users");
       } finally {
         setLoading(false);
@@ -45,19 +109,178 @@ export default function Sidebar({ onSelect, selectedId }) {
     u.username?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleProfileUpdated = () => {
-    setRefreshTrigger(prev => prev + 1);
-    refreshMe();
+  // Inline styles object
+  const styles = {
+    sidebar: {
+      width: '320px',
+      height: '100vh',
+      backgroundColor: '#1f2937',
+      borderRight: '1px solid #374151',
+      display: 'flex',
+      flexDirection: 'column'
+    },
+    header: {
+      padding: '16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      borderBottom: '1px solid #374151'
+    },
+    userInfo: {
+      flex: 1,
+      minWidth: 0
+    },
+    username: {
+      color: 'white',
+      fontWeight: '600',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0,
+      fontSize: '14px'
+    },
+    email: {
+      color: '#9ca3af',
+      fontSize: '12px',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      margin: 0
+    },
+    button: {
+      padding: '8px',
+      borderRadius: '6px',
+      border: '1px solid #4b5563',
+      color: '#d1d5db',
+      backgroundColor: 'transparent',
+      cursor: 'pointer',
+      fontSize: '12px'
+    },
+    adminLink: {
+      padding: '12px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      borderBottom: '1px solid #374151',
+      color: '#60a5fa',
+      textDecoration: 'none',
+      cursor: 'pointer',
+      fontSize: '14px'
+    },
+    searchContainer: {
+      padding: '12px',
+      borderBottom: '1px solid #374151'
+    },
+    searchBox: {
+      position: 'relative'
+    },
+    searchIcon: {
+      position: 'absolute',
+      top: '50%',
+      left: '12px',
+      transform: 'translateY(-50%)',
+      color: '#9ca3af'
+    },
+    searchInput: {
+      width: '100%',
+      padding: '8px 8px 8px 36px',
+      backgroundColor: '#374151',
+      border: '1px solid #4b5563',
+      borderRadius: '6px',
+      color: 'white',
+      outline: 'none',
+      fontSize: '14px'
+    },
+    contactsHeader: {
+      padding: '12px 16px',
+      borderBottom: '1px solid #374151',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      fontSize: '14px',
+      color: '#9ca3af'
+    },
+    onlineCount: {
+      color: '#60a5fa',
+      fontWeight: '500'
+    },
+    userList: {
+      flex: 1,
+      overflowY: 'auto'
+    },
+    userButton: {
+      width: '100%',
+      textAlign: 'left',
+      padding: '12px 16px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      border: 'none',
+      cursor: 'pointer',
+      borderRight: '3px solid transparent'
+    },
+    userButtonSelected: {
+      backgroundColor: '#1e40af'
+    },
+    userInfoText: {
+      flex: 1,
+      minWidth: 0
+    },
+    userStatus: {
+      fontSize: '12px',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '4px'
+    },
+    statusDot: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%'
+    },
+    footer: {
+      padding: '12px',
+      borderTop: '1px solid #374151',
+      backgroundColor: '#111827',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      fontSize: '14px',
+      color: '#9ca3af'
+    },
+    loadingContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      color: 'white'
+    },
+    errorContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: '100%',
+      flexDirection: 'column',
+      gap: '8px'
+    },
+    errorText: {
+      color: '#f87171'
+    },
+    retryButton: {
+      padding: '6px 12px',
+      borderRadius: '6px',
+      backgroundColor: '#374151',
+      color: '#d1d5db',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '12px'
+    }
   };
-
-  console.log("Current user:", user);
-  console.log("All users:", users);
 
   if (loading) {
     return (
-      <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
-        <div className="flex items-center justify-center h-full">
-          <div className="text-white">Loading users...</div>
+      <div style={styles.sidebar}>
+        <div style={styles.loadingContainer}>
+          <div>Loading users...</div>
         </div>
       </div>
     );
@@ -65,12 +288,12 @@ export default function Sidebar({ onSelect, selectedId }) {
 
   if (error) {
     return (
-      <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
-        <div className="flex items-center justify-center h-full flex-col gap-2">
-          <div className="text-red-400">{error}</div>
+      <div style={styles.sidebar}>
+        <div style={styles.errorContainer}>
+          <div style={styles.errorText}>{error}</div>
           <button 
             onClick={() => setRefreshTrigger(prev => prev + 1)}
-            className="px-3 py-1.5 rounded-xl bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 transition-all duration-200"
+            style={styles.retryButton}
           >
             Retry
           </button>
@@ -80,81 +303,70 @@ export default function Sidebar({ onSelect, selectedId }) {
   }
 
   return (
-    <div className="h-full w-80 bg-gray-800/80 backdrop-blur-xl border-r border-gray-700/50 flex flex-col">
+    <div style={styles.sidebar}>
       {/* User Profile Header */}
-      <div className="p-4 flex items-center gap-3 border-b border-gray-700/50">
-        <Avatar url={user?.avatarUrl} size={10} online={true} />
-        <div className="flex-1 min-w-0">
-          <div className="text-white font-semibold truncate">{user?.username}</div>
-          <div className="text-xs text-gray-400 truncate">{user?.email}</div>
+      <div style={styles.header}>
+        <SimpleAvatar user={user} online={true} size={40} />
+        <div style={styles.userInfo}>
+          <div style={styles.username}>{user?.username}</div>
+          <div style={styles.email}>{user?.email}</div>
         </div>
         <button
           onClick={() => setOpen(true)}
-          className="px-3 py-1.5 rounded-xl border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200"
+          style={styles.button}
           title="Edit Profile"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
+          Edit
         </button>
         <button
           onClick={logout}
-          className="px-3 py-1.5 rounded-xl bg-gray-700 text-gray-300 hover:text-white hover:bg-gray-600 transition-all duration-200"
+          style={{...styles.button, backgroundColor: '#374151', border: 'none'}}
           title="Logout"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 0 013-3h4a3 3 0 013 3v1" />
-          </svg>
+          Logout
         </button>
       </div>
 
-      {/* Admin Dashboard Link (only for admin users) */}
+      {/* Admin Dashboard Link */}
       {user && user.isAdmin && (
         <Link 
           to="/admin/dashboard"
-          className="px-4 py-3 flex items-center gap-3 border-b border-gray-700/50 cursor-pointer text-blue-400 hover:bg-gray-700/50 transition-all duration-200"
-          title="Access admin management panel"
+          style={styles.adminLink}
         >
-          <AdminPanelSettings className="text-blue-400" />
-          <span className="font-medium">Admin Dashboard</span>
+          <span>⚙️</span>
+          <span style={{ fontWeight: '500' }}>Admin Dashboard</span>
         </Link>
       )}
 
       {/* Search Bar */}
-      <div className="p-3 border-b border-gray-700/50">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </div>
+      <div style={styles.searchContainer}>
+        <div style={styles.searchBox}>
+          <div style={styles.searchIcon}>🔍</div>
           <input
             placeholder="Search people..."
-            className="w-full pl-10 pr-4 py-2 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+            style={styles.searchInput}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
         </div>
       </div>
 
-      {/* Online Status Counter */}
-      <div className="px-4 py-2 border-b border-gray-700/50">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-400">Contacts</span>
-          <span className="text-blue-400 font-medium">
-            {filteredUsers.filter(u => isOnline(u._id)).length} online
-          </span>
-        </div>
+      {/* Contacts Header */}
+      <div style={styles.contactsHeader}>
+        <span>Contacts</span>
+        <span style={styles.onlineCount}>
+          {filteredUsers.filter(u => isOnline(u._id)).length} online
+        </span>
       </div>
 
       {/* Users List */}
-      <div className="flex-1 overflow-y-auto">
+      <div style={styles.userList}>
         {filteredUsers.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="text-gray-400 mb-2">
+          <div style={{ textAlign: 'center', padding: '32px' }}>
+            <div style={{ color: '#9ca3af', marginBottom: '8px' }}>
               {users.length === 0 ? "No users found" : "No matching users"}
             </div>
-            <div className="text-gray-500 text-sm">
+            <div style={{ color: '#6b7280', fontSize: '14px' }}>
               {users.length === 0 ? "The users list is empty" : "Try a different search term"}
             </div>
           </div>
@@ -163,53 +375,46 @@ export default function Sidebar({ onSelect, selectedId }) {
             <button
               key={u._id}
               onClick={() => onSelect(u)}
-              className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-all duration-200 ${selectedId === u._id
-                ? "bg-blue-600/20 border-r-2 border-blue-500"
-                : "hover:bg-gray-700/50"
-                }`}
+              style={{
+                ...styles.userButton,
+                ...(selectedId === u._id ? styles.userButtonSelected : {}),
+                borderRightColor: selectedId === u._id ? '#3b82f6' : 'transparent'
+              }}
             >
-              <Avatar
-                url={u.avatarUrl} 
-                size={10}
-                online={isOnline(u._id)}
-                onError={() => console.log(`Avatar for ${u.username} failed to load`)}
-              />
-              <div className="flex-1 min-w-0">
-                <div className="text-white font-medium truncate">{u.username}</div>
-                <div className="text-xs flex items-center">
+              <SimpleAvatar user={u} online={isOnline(u._id)} size={40} />
+              <div style={styles.userInfoText}>
+                <div style={styles.username}>
+                  {u.username}
+                </div>
+                <div style={styles.userStatus}>
                   {isOnline(u._id) ? (
-                    <span className="text-green-400 flex items-center">
-                      <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-                      Online
-                    </span>
+                    <>
+                      <div style={{...styles.statusDot, backgroundColor: '#10b981'}}></div>
+                      <span style={{ color: '#10b981' }}>Online</span>
+                    </>
                   ) : (
-                    <span className="text-gray-500">Offline</span>
+                    <span style={{ color: '#6b7280' }}>Offline</span>
                   )}
                 </div>
               </div>
-              {selectedId === u._id && (
-                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              )}
             </button>
           ))
         )}
       </div>
 
       {/* Connection Status */}
-      <div className="p-3 border-t border-gray-700/50 bg-gray-800/50">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-400">Connection</span>
-          <span className="text-green-400 flex items-center">
-            <span className="w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-            Connected
-          </span>
-        </div>
+      <div style={styles.footer}>
+        <span>Connection</span>
+        <span style={{ color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <div style={{...styles.statusDot, backgroundColor: '#10b981'}}></div>
+          Connected
+        </span>
       </div>
 
       <EditProfileModal
         open={open}
         onClose={() => setOpen(false)}
-        onProfileUpdated={handleProfileUpdated}
+        onProfileUpdated={() => setRefreshTrigger(prev => prev + 1)}
       />
     </div>
   );
