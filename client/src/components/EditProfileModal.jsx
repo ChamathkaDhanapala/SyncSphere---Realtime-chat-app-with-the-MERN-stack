@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext.jsx";
 
 export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
@@ -10,7 +10,7 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [imageLoading, setImageLoading] = useState(false);
-
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -26,6 +26,8 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0];
+    console.log("File selected:", selectedFile); 
+    
     if (selectedFile) {
       if (selectedFile.size > 5 * 1024 * 1024) {
         setError("File size must be less than 5MB");
@@ -33,19 +35,34 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
       }
 
       if (!selectedFile.type.startsWith('image/')) {
-        setError("Please select an image file");
+        setError("Please select an image file (JPEG, PNG, GIF)");
         return;
       }
 
       setFile(selectedFile);
       setError("");
-      setPreviewUrl(URL.createObjectURL(selectedFile));
+      
+  
+      const objectUrl = URL.createObjectURL(selectedFile);
+      setPreviewUrl(objectUrl);
+      console.log("Preview URL created:", objectUrl); // Debug log
+    }
+  };
+
+  const triggerFileInput = () => {
+    if (fileInputRef.current && !isLoading) {
+      fileInputRef.current.click();
     }
   };
 
   const onSave = async () => {
     if (!username.trim()) {
       setError("Username is required");
+      return;
+    }
+
+    if (!updateProfile || typeof updateProfile !== 'function') {
+      setError("Profile update functionality is not available.");
       return;
     }
 
@@ -60,12 +77,12 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
       
       if (file) {
         fd.append("avatar", file);
+        console.log("Adding file to FormData:", file.name); // Debug log
       }
 
-      console.log("📤 Sending profile update...");
-
+      console.log("FormData contents:");
       for (let [key, value] of fd.entries()) {
-        console.log(`📝 ${key}:`, value);
+        console.log(key, value);
       }
 
       const result = await updateProfile(fd);
@@ -83,24 +100,10 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
         const status = error.response.status;
         const message = error.response.data?.message || error.response.data?.error;
         
-        switch (status) {
-          case 400:
-            setError(message || "Invalid request. Please check your input.");
-            break;
-          case 401:
-            setError("Please login again. Your session may have expired.");
-            break;
-          case 413:
-            setError("File too large. Please select a smaller image.");
-            break;
-          case 415:
-            setError("Invalid file type. Please select a JPEG, PNG, or GIF image.");
-            break;
-          case 500:
-            setError("Server error. Please try again later.");
-            break;
-          default:
-            setError(message || `Update failed (${status}). Please try again.`);
+        if (status === 500) {
+          setError("Server error: Unable to process your request. This might be a backend issue.");
+        } else {
+          setError(message || `Update failed (Error ${status}). Please try again.`);
         }
       } else if (error.request) {
         setError("Network error. Please check your connection and try again.");
@@ -113,6 +116,32 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
     }
   };
 
+  const handleImageError = (e) => {
+    console.error("Image load error for URL:", e.target.src);
+    if (e.target.src.includes('localhost:3000')) {
+      const correctedUrl = e.target.src.replace('localhost:3000', 'localhost:5000');
+      e.target.src = correctedUrl;
+      return;
+    }
+    const fallbackUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=3B82F6&color=ffffff&size=64&bold=true`;
+    e.target.src = fallbackUrl;
+    setImageLoading(false);
+  };
+
+  const getAvatarUrl = () => {
+    if (previewUrl) return previewUrl;
+    if (user?.avatarUrl) {
+      let avatarUrl = user.avatarUrl;
+      if (!avatarUrl.startsWith('http')) {
+        avatarUrl = `http://localhost:5000${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
+      } else if (avatarUrl.includes('localhost:3000')) {
+        avatarUrl = avatarUrl.replace('localhost:3000', 'localhost:5000');
+      }
+      return avatarUrl;
+    }
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=3B82F6&color=ffffff&size=64&bold=true`;
+  };
+
   const handleCancel = () => {
     setError("");
     setFile(null);
@@ -120,155 +149,214 @@ export default function EditProfileModal({ open, onClose, onProfileUpdated }) {
     onClose();
   };
 
+  const removeFile = () => {
+    setFile(null);
+    setPreviewUrl(user?.avatarUrl || null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Inline styles
+  const styles = {
+    overlay: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.7)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px'
+    },
+    modal: {
+      backgroundColor: '#1f2937', borderRadius: '12px', width: '100%', maxWidth: '450px',
+      border: '1px solid #374151', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)'
+    },
+    header: {
+      padding: '20px', borderBottom: '1px solid #374151', display: 'flex',
+      justifyContent: 'space-between', alignItems: 'center'
+    },
+    title: { color: 'white', fontSize: '20px', fontWeight: '600', margin: 0 },
+    subtitle: { color: '#9ca3af', fontSize: '14px', margin: '4px 0 0 0' },
+    closeBtn: {
+      background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer',
+      padding: '8px', borderRadius: '6px', fontSize: '18px'
+    },
+    content: { padding: '20px', maxHeight: '60vh', overflowY: 'auto' },
+    error: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #dc2626',
+      borderRadius: '8px', padding: '12px', color: '#fca5a5', fontSize: '14px', marginBottom: '16px'
+    },
+    avatarSection: {
+      display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px',
+      padding: '12px', backgroundColor: 'rgba(31, 41, 55, 0.5)', borderRadius: '8px'
+    },
+    avatarPreview: {
+      width: '80px', height: '80px', borderRadius: '50%',
+      background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex',
+      alignItems: 'center', justifyContent: 'center', color: 'white',
+      fontWeight: '600', fontSize: '24px', overflow: 'hidden', flexShrink: 0
+    },
+    fileSection: { flex: 1 },
+    fileLabel: { 
+      display: 'block', color: '#d1d5db', fontSize: '14px', fontWeight: '500', marginBottom: '8px' 
+    },
+    fileUploadArea: {
+      border: '2px dashed #4b5563', borderRadius: '8px', padding: '16px',
+      textAlign: 'center', cursor: 'pointer', marginBottom: '8px',
+      transition: 'border-color 0.2s'
+    },
+    fileInput: { display: 'none' },
+    fileInfo: { fontSize: '12px', color: '#10b981' },
+    removeBtn: {
+      background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
+      fontSize: '12px', textDecoration: 'underline', marginTop: '4px'
+    },
+    formGroup: { marginBottom: '20px' },
+    label: { display: 'block', fontSize: '14px', fontWeight: '500', color: '#d1d5db', marginBottom: '8px' },
+    input: {
+      width: '100%', backgroundColor: '#111827', border: '1px solid #374151',
+      borderRadius: '8px', padding: '12px', color: 'white', fontSize: '14px', boxSizing: 'border-box'
+    },
+    textarea: { resize: 'vertical', minHeight: '100px' },
+    footer: { padding: '20px', borderTop: '1px solid #374151', display: 'flex', gap: '12px' },
+    btn: {
+      padding: '12px 20px', borderRadius: '8px', fontWeight: '500', fontSize: '14px',
+      cursor: 'pointer', border: 'none', flex: 1
+    },
+    btnSecondary: { backgroundColor: '#374151', color: '#d1d5db' },
+    btnPrimary: { backgroundColor: '#3b82f6', color: 'white' },
+    disabled: { opacity: 0.6, cursor: 'not-allowed' },
+    loadingSpinner: {
+      width: '16px', height: '16px', border: '2px solid transparent',
+      borderTop: '2px solid white', borderRadius: '50%',
+      animation: 'spin 1s linear infinite', display: 'inline-block', marginRight: '8px'
+    }
+  };
+
+  const spinnerStyles = `@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`;
+
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div
-        className="bg-gray-800/90 backdrop-blur-xl border border-gray-700/50 rounded-2xl shadow-2xl w-full max-w-md my-8"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="sticky top-0 bg-gray-800/90 backdrop-blur-xl border-b border-gray-700/50 p-6 rounded-t-2xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-white">Edit Profile</h2>
-            <button
-              onClick={handleCancel}
-              className="text-gray-400 hover:text-white transition-colors duration-200 p-1 rounded-lg hover:bg-gray-700/50"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="max-h-[60vh] overflow-y-auto p-6 space-y-5">
-          {/* Error message */}
-          {error && (
-            <div className="p-3 bg-red-500/20 border border-red-500/50 rounded-lg text-red-200 text-sm">
-              {error}
-            </div>
-          )}
-
-          {/* Current Avatar Preview */}
-          <div className="flex items-center space-x-4">
-            <div className="relative w-16 h-16 bg-gradient-to-r from-blue-600 to-blue-700 rounded-full flex items-center justify-center text-white font-semibold text-xl overflow-hidden">
-              {imageLoading ? (
-                <div className="absolute inset-0 flex items-center justify-center bg-gray-800/50">
-                  <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                </div>
-              ) : previewUrl ? (
-                <img
-                  src={previewUrl}
-                  alt="Profile preview"
-                  className="w-16 h-16 rounded-full object-cover"
-                  onLoad={() => setImageLoading(false)}
-                  onError={(e) => {
-                    console.error("Image load error");
-                    e.target.src = `https://api.dicebear.com/9.x/initials/svg?seed=${username}`;
-                    setImageLoading(false);
-                  }}
-                />
-              ) : (
-                user?.username?.charAt(0)?.toUpperCase() || 'U'
-              )}
-            </div>
+    <>
+      <style>{spinnerStyles}</style>
+      <div style={styles.overlay} onClick={handleCancel}>
+        <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+          
+          {/* Header */}
+          <div style={styles.header}>
             <div>
-              <p className="text-white font-medium">Profile Picture</p>
-              <p className="text-gray-400 text-sm">
-                {file ? "New image selected" : "Current profile picture"}
-              </p>
+              <h2 style={styles.title}>Edit Profile</h2>
+              <p style={styles.subtitle}>Update your profile information</p>
             </div>
+            <button style={styles.closeBtn} onClick={handleCancel} disabled={isLoading}>✕</button>
           </div>
 
-          {/* Username */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Display Name *</label>
-            <input
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-              placeholder="Enter your display name"
-              disabled={isLoading}
-            />
-          </div>
+          {/* Content */}
+          <div style={styles.content}>
+            {error && <div style={styles.error}>{error}</div>}
 
-          {/* Bio */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Bio</label>
-            <textarea
-              value={bio}
-              onChange={e => setBio(e.target.value)}
-              rows="3"
-              className="w-full p-3 bg-gray-700/50 border border-gray-600/50 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
-              placeholder="Tell us something about yourself..."
-              disabled={isLoading}
-            />
-          </div>
+            {/* Avatar Section */}
+            <div style={styles.avatarSection}>
+              <div style={styles.avatarPreview}>
+                {imageLoading ? (
+                  <div style={styles.loadingSpinner}></div>
+                ) : previewUrl || user?.avatarUrl ? (
+                  <img
+                    src={getAvatarUrl()}
+                    alt="Profile preview"
+                    style={{width: '100%', height: '100%', objectFit: 'cover'}}
+                    onLoad={() => setImageLoading(false)}
+                    onError={handleImageError}
+                  />
+                ) : (
+                  user?.username?.charAt(0)?.toUpperCase() || 'U'
+                )}
+              </div>
+              
+              <div style={styles.fileSection}>
+                <label style={styles.fileLabel}>Profile Picture</label>
+                <div 
+                  style={styles.fileUploadArea}
+                  onClick={triggerFileInput}
+                  onMouseEnter={(e) => e.target.style.borderColor = '#3b82f6'}
+                  onMouseLeave={(e) => e.target.style.borderColor = '#4b5563'}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    style={styles.fileInput}
+                    disabled={isLoading}
+                  />
+                  {file ? (
+                    <div>
+                      <div>✅ {file.name}</div>
+                      <div style={{fontSize: '12px', color: '#9ca3af', marginTop: '4px'}}>
+                        Size: {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </div>
+                      <button 
+                        type="button"
+                        style={styles.removeBtn}
+                        onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div>📁 Click to upload new image</div>
+                      <div style={{fontSize: '12px', color: '#9ca3af', marginTop: '4px'}}>
+                        PNG, JPG, GIF up to 5MB
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
 
-          {/* File Upload */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-300">Profile Picture</label>
-            <div className="relative">
+            {/* Username */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Display Name *</label>
               <input
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                id="avatar-upload"
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                style={{...styles.input, ...(isLoading ? styles.disabled : {})}}
+                placeholder="Enter your display name"
                 disabled={isLoading}
               />
-              <label
-                htmlFor="avatar-upload"
-                className={`block w-full p-3 border rounded-xl cursor-pointer transition-all duration-200 border-dashed ${
-                  isLoading 
-                    ? 'bg-gray-600/50 border-gray-500 text-gray-400 cursor-not-allowed' 
-                    : 'bg-gray-700/50 border-gray-600/50 text-gray-400 hover:bg-gray-700/70'
-                }`}
-              >
-                <div className="flex items-center space-x-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-                  </svg>
-                  <span>{file ? file.name : "Choose an image..."}</span>
-                </div>
-              </label>
             </div>
-            {file && (
-              <p className="text-green-400 text-sm">
-                ✓ Ready to upload: {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-              </p>
-            )}
-          </div>
-        </div>
 
-        {/* Buttons */}
-        <div className="sticky bottom-0 bg-gray-800/90 backdrop-blur-xl border-t border-gray-700/50 p-6 rounded-b-2xl">
-          <div className="flex gap-3 justify-end">
+            {/* Bio */}
+            <div style={styles.formGroup}>
+              <label style={styles.label}>Bio</label>
+              <textarea
+                value={bio}
+                onChange={(e) => setBio(e.target.value)}
+                style={{...styles.input, ...styles.textarea, ...(isLoading ? styles.disabled : {})}}
+                placeholder="Tell us something about yourself..."
+                disabled={isLoading}
+                rows="4"
+              />
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div style={styles.footer}>
             <button
               onClick={handleCancel}
+              style={{...styles.btn, ...styles.btnSecondary, ...(isLoading ? styles.disabled : {})}}
               disabled={isLoading}
-              className="px-6 py-3 rounded-xl border border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700/50 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
             <button
               onClick={onSave}
+              style={{...styles.btn, ...styles.btnPrimary, ...((isLoading || !username.trim()) ? styles.disabled : {})}}
               disabled={isLoading || !username.trim()}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 text-white font-medium hover:from-blue-500 hover:to-blue-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
-                <div className="flex items-center">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Saving...
-                </div>
-              ) : (
-                "Save Changes"
-              )}
+              {isLoading ? (<><span style={styles.loadingSpinner}></span> Saving...</>) : "Save Changes"}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
