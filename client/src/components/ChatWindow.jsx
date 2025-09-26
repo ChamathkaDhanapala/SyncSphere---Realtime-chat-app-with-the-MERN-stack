@@ -1,33 +1,94 @@
 import { useEffect, useRef } from "react";
-import { format } from "date-fns";
 
 export default function ChatWindow({ me, peer, messages }) {
-    const endRef = useRef(null);
-    useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+  const endRef = useRef(null);
 
-    return (
-        <div className="flex flex-col h-full">
-            <div className="px-4 py-3 border-b border-slate-800 flex items-center gap-3">
-                <img
-                    src={peer?.avatarUrl || `https://api.dicebear.com/9.x/initials/svg?seed=${peer?.username || "U"}`}
-                    alt={`${peer?.username || "User"} avatar`} 
-                    className="w-8 h-8 rounded-full"
-                />
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-                <div>
-                    <div className="font-medium">{peer?.username}</div>
-                    <div className="text-xs text-slate-400">{peer?.online ? "Online" : "Offline"}</div>
+  const formatTime = (dateString) => {
+    return new Date(dateString).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        backgroundColor: "#0f172a",
+      }}
+    >
+      <div
+        style={{
+          flex: 1,
+          overflowY: "auto",
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "8px",
+        }}
+      >
+        {messages.map((msg) => {
+          let senderId = msg.sender;
+          if (msg.sender && typeof msg.sender === "object") {
+            senderId = msg.sender._id;
+          }
+
+          const isOwnMessage = senderId === me?._id;
+
+          console.log("Message debug:", {
+            messageId: msg._id,
+            rawSender: msg.sender,
+            extractedSenderId: senderId,
+            currentUserId: me?._id,
+            isOwnMessage: isOwnMessage,
+            messageText: msg.text,
+          });
+
+          return (
+            <div
+              key={msg._id}
+              style={{
+                display: "flex",
+                justifyContent: isOwnMessage ? "flex-end" : "flex-start",
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: "70%",
+                  padding: "12px 16px",
+                  borderRadius: "18px",
+                  backgroundColor: isOwnMessage ? "#3b82f6" : "#374151",
+                  color: "white",
+                  borderBottomRightRadius: isOwnMessage ? "4px" : "18px",
+                  borderBottomLeftRadius: isOwnMessage ? "18px" : "4px",
+                }}
+              >
+                <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
+                  {msg.text}
                 </div>
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: isOwnMessage ? "#bfdbfe" : "#9ca3af",
+                    textAlign: "right",
+                    marginTop: "4px",
+                  }}
+                >
+                  {formatTime(msg.createdAt)}
+                  {isOwnMessage && " ✓"}
+                </div>
+              </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {messages.map((m) => (
-                    <div key={m._id} className={`max-w-[70%] rounded-2xl px-4 py-2 ${m.sender === me?._id ? "ml-auto bg-emerald-600/30" : "bg-slate-800"}`}>
-                        <div className="text-sm">{m.text}</div>
-                        <div className="text-[10px] text-slate-400 mt-0.5 text-right">{format(new Date(m.createdAt), "p")}</div>
-                    </div>
-                ))}
-                <div ref={endRef} />
-            </div>
-        </div>
-    );
+          );
+        })}
+        <div ref={endRef} />
+      </div>
+    </div>
+  );
 }
