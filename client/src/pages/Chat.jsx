@@ -5,302 +5,259 @@ import MessageInput from "../components/MessageInput.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
 import { api } from "../lib/api.js";
-import {
-  Box,
-  Paper,
-  Typography,
-  Avatar,
-  Chip,
-  alpha
-} from "@mui/material";
-import {
-  Chat as ChatIcon,
-  Circle,
-  Wifi
-} from "@mui/icons-material";
 
 export default function Chat() {
   const { user } = useAuth();
-  const { socket } = useSocket();
+  const { socket, isOnline } = useSocket();
   const [peer, setPeer] = useState(null);
   const [messages, setMessages] = useState([]);
 
   useEffect(() => {
-    if (!socket) return;
-    const onNew = ({ message }) => {
-      if ((peer && [user._id, peer._id].includes(message.sender)) || !peer) {
-        setMessages(prev => [...prev, message]);
+    if (!peer) return;
+
+    const loadMessages = async () => {
+      try {
+        const { data } = await api.get(`/messages/${peer._id}`);
+        setMessages(data || []);
+      } catch (error) {
+        console.log("No messages found, starting fresh");
+        setMessages([]);
       }
     };
-    socket.on("message:new", onNew);
-    return () => { socket.off("message:new", onNew); };
+
+    loadMessages();
+  }, [peer]);
+
+  // Socket message listener
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessage = ({ message }) => {
+      if (!peer || message.sender === peer._id || message.sender === user._id) {
+        setMessages((prev) => [...prev, message]);
+      }
+    };
+
+    socket.on("message:new", handleNewMessage);
+    return () => socket.off("message:new", handleNewMessage);
   }, [socket, peer, user]);
 
-  const selectPeer = async (u) => {
-    setPeer(u);
+  const selectPeer = (selectedPeer) => {
+    setPeer(selectedPeer);
+  };
+
+  const sendMessage = async (text) => {
+    if (!peer || !text.trim()) return;
+
+    const tempMessage = {
+      _id: Date.now().toString(),
+      text,
+      sender: user._id,
+      createdAt: new Date().toISOString(),
+      isTemp: true,
+    };
+
+    console.log("Sending message:", {
+      tempMessageSender: tempMessage.sender,
+      currentUserId: user._id,
+      peerId: peer._id,
+    });
+
+    setMessages((prev) => [...prev, tempMessage]);
+
     try {
-      const { data } = await api.get(`/api/messages/${u._id}`);
-      setMessages(data);
+      const { data } = await api.post("/messages/send", {
+        to: peer._id,
+        text: text,
+      });
+
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
+      );
     } catch (error) {
-      if (error.response?.status === 404) {
-        setMessages([]);
-      } else {
-        console.error("Error fetching messages:", error);
+      console.error("API failed, using socket");
+
+      if (socket) {
+        socket.emit("message:send", { to: peer._id, text });
       }
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempMessage._id ? { ...msg, sent: true } : msg
+        )
+      );
     }
   };
 
-  const send = (text) => {
-    if (!peer || !socket) return;
-    socket.emit("message:send", { to: peer._id, text });
-  };
-
   return (
-    <Box
-      sx={{
+    <div
+      style={{
         height: "100vh",
-        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)",
-        overflow: "hidden",
-        position: "relative"
+        display: "flex",
+        backgroundColor: "#0f172a",
       }}
     >
-      {/* Animated background elements */}
-      <Box
-        sx={{
-          position: "absolute",
-          inset: 0,
-          overflow: "hidden",
-          "&::before, &::after": {
-            content: '""',
-            position: "absolute",
-            borderRadius: "50%",
-            filter: "blur(40px)",
-            opacity: 0.1,
-            animation: "pulse 4s ease-in-out infinite"
-          },
-          "&::before": {
-            top: -80,
-            right: -80,
-            width: 240,
-            height: 240,
-            background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-            animationDelay: "0s"
-          },
-          "&::after": {
-            bottom: -80,
-            left: -80,
-            width: 240,
-            height: 240,
-            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)",
-            animationDelay: "2s"
-          },
-          "@keyframes pulse": {
-            "0%, 100%": { opacity: 0.1 },
-            "50%": { opacity: 0.15 }
-          }
-        }}
-      />
-
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: 10,
-          height: "100vh",
-          display: "flex"
+      {/* Sidebar */}
+      <div
+        style={{
+          width: "320px",
+          backgroundColor: "#1f2937",
+          borderRight: "1px solid #374151",
         }}
       >
-        {/* Sidebar */}
-        <Box
-          sx={{
-            width: 320,
-            background: "linear-gradient(135deg, rgba(26, 31, 59, 0.95) 0%, rgba(45, 27, 78, 0.95) 100%)",
-            backdropFilter: "blur(20px)",
-            borderRight: "1px solid",
-            borderColor: alpha("#fff", 0.1),
-            boxShadow: "0 0 40px rgba(0, 0, 0, 0.3)"
-          }}
-        >
-          <Sidebar onSelect={selectPeer} selectedId={peer?._id} />
-        </Box>
-        
-        {/* Main Chat Area */}
-        <Box
-          sx={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            background: alpha("#000", 0.2)
-          }}
-        >
-          {peer ? (
-            <>
-              {/* Chat Header */}
-              <Paper
-                elevation={0}
-                sx={{
-                  px: 4,
-                  py: 3,
-                  background: "linear-gradient(135deg, rgba(26, 31, 59, 0.95) 0%, rgba(45, 27, 78, 0.95) 100%)",
-                  backdropFilter: "blur(20px)",
-                  borderBottom: "1px solid",
-                  borderColor: alpha("#fff", 0.1),
-                  borderRadius: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 2
-                }}
-              >
-                <Box sx={{ position: "relative" }}>
-                  <Avatar
-                    sx={{
-                      width: 48,
-                      height: 48,
-                      bgcolor: "primary.main",
-                      fontSize: "1.2rem",
-                      fontWeight: 600
-                    }}
-                  >
-                    {peer.username?.charAt(0)?.toUpperCase()}
-                  </Avatar>
-                  {peer.online && (
-                    <Circle
-                      sx={{
-                        position: "absolute",
-                        bottom: 0,
-                        right: 0,
-                        fontSize: "12px",
-                        color: "#38a169",
-                        bgcolor: "white",
-                        borderRadius: "50%",
-                        filter: "drop-shadow(0 0 2px #38a169)"
-                      }}
-                    />
-                  )}
-                </Box>
-                
-                <Box>
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      color: "white",
-                      fontWeight: 600,
-                      fontSize: "1.1rem"
-                    }}
-                  >
-                    {peer.username}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: peer.online ? "#38a169" : alpha("#fff", 0.6),
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.5
-                    }}
-                  >
-                    <Circle sx={{ fontSize: "8px" }} />
-                    {peer.online ? "Online" : "Offline"}
-                  </Typography>
-                </Box>
-              </Paper>
+        <Sidebar onSelect={selectPeer} selectedId={peer?._id} />
+      </div>
 
-              {/* Chat Window */}
-              <Box sx={{ flex: 1, overflow: "hidden" }}>
-                <ChatWindow me={user} peer={peer} messages={messages} />
-              </Box>
-
-              {/* Message Input */}
-              <Box
-                sx={{
-                  background: "linear-gradient(135deg, rgba(26, 31, 59, 0.95) 0%, rgba(45, 27, 78, 0.95) 100%)",
-                  backdropFilter: "blur(20px)",
-                  borderTop: "1px solid",
-                  borderColor: alpha("#fff", 0.1)
-                }}
-              >
-                <MessageInput onSend={send} />
-              </Box>
-            </>
-          ) : (
-            <Box
-              sx={{
-                height: "100%",
+      {/* Main Chat Area */}
+      <div
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        {peer ? (
+          <>
+            {/* Chat Header */}
+            <div
+              style={{
+                padding: "16px 24px",
+                backgroundColor: "#1f2937",
+                borderBottom: "1px solid #374151",
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                background: alpha("#000", 0.1),
-                backdropFilter: "blur(10px)"
+                gap: "12px",
               }}
             >
-              <Box sx={{ textAlign: "center" }}>
-                <Paper
-                  elevation={0}
-                  sx={{
-                    width: 100,
-                    height: 100,
-                    background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
-                    borderRadius: 3,
+              <div style={{ position: "relative" }}>
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "50%",
+                    backgroundColor: "#3b82f6",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    mx: "auto",
-                    mb: 4,
-                    boxShadow: "0 8px 32px rgba(59, 130, 246, 0.3)"
-                  }}
-                >
-                  <ChatIcon sx={{ fontSize: 40, color: "white" }} />
-                </Paper>
-                <Typography
-                  variant="h5"
-                  sx={{
                     color: "white",
-                    fontWeight: 700,
-                    mb: 1,
-                    fontSize: "1.5rem"
+                    fontWeight: "bold",
+                    fontSize: "18px",
                   }}
                 >
-                  Welcome to SyncSphere
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: alpha("#fff", 0.7),
-                    mb: 0.5
+                  {peer.username?.charAt(0)?.toUpperCase()}
+                </div>
+                {isOnline(peer._id) && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: "2px",
+                      right: "2px",
+                      width: "12px",
+                      height: "12px",
+                      backgroundColor: "#10b981",
+                      border: "2px solid #1f2937",
+                      borderRadius: "50%",
+                    }}
+                  />
+                )}
+              </div>
+              <div>
+                <div
+                  style={{
+                    color: "white",
+                    fontWeight: "600",
+                    fontSize: "16px",
                   }}
                 >
-                  Select a contact to start chatting
-                </Typography>
-              </Box>
-            </Box>
-          )}
-        </Box>
-      </Box>
+                  {peer.username}
+                </div>
+                <div
+                  style={{
+                    color: isOnline(peer._id) ? "#10b981" : "#9ca3af",
+                    fontSize: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "6px",
+                      height: "6px",
+                      backgroundColor: isOnline(peer._id)
+                        ? "#10b981"
+                        : "#9ca3af",
+                      borderRadius: "50%",
+                    }}
+                  />
+                  {isOnline(peer._id) ? "Online" : "Offline"}
+                </div>
+              </div>
+            </div>
 
-      {/* Status Bar */}
-      <Box
-        sx={{
-          position: "fixed",
-          bottom: 16,
-          left: 16,
-          zIndex: 20
-        }}
-      >
-        <Chip
-          icon={<Wifi sx={{ fontSize: 16, color: "#38a169" }} />}
-          label="Connected"
-          sx={{
-            background: alpha("#1a1f3b", 0.9),
-            backdropFilter: "blur(20px)",
-            border: "1px solid",
-            borderColor: alpha("#fff", 0.1),
-            color: "#38a169",
-            fontWeight: 600,
-            "& .MuiChip-icon": {
-              color: "#38a169 !important"
-            }
-          }}
-        />
-      </Box>
-    </Box>
+            {/* Chat Window */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              <ChatWindow me={user} peer={peer} messages={messages} />
+            </div>
+
+            {/* Message Input */}
+            <div
+              style={{
+                backgroundColor: "#1f2937",
+                borderTop: "1px solid #374151",
+              }}
+            >
+              <MessageInput onSend={sendMessage} />
+            </div>
+          </>
+        ) : (
+          <div
+            style={{
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "rgba(0, 0, 0, 0.1)",
+            }}
+          >
+            <div style={{ textAlign: "center" }}>
+              <div
+                style={{
+                  width: "100px",
+                  height: "100px",
+                  backgroundColor: "#3b82f6",
+                  borderRadius: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  margin: "0 auto 16px auto",
+                  boxShadow: "0 8px 32px rgba(59, 130, 246, 0.3)",
+                }}
+              >
+                <span style={{ fontSize: "40px", color: "white" }}>💬</span>
+              </div>
+              <div
+                style={{
+                  color: "white",
+                  fontWeight: "700",
+                  fontSize: "20px",
+                  marginBottom: "8px",
+                }}
+              >
+                Welcome to SyncSphere
+              </div>
+              <div
+                style={{
+                  color: "rgba(255, 255, 255, 0.7)",
+                  fontSize: "14px",
+                }}
+              >
+                Select a contact to start chatting
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
