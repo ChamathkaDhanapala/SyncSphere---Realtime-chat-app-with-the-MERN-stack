@@ -1,4 +1,10 @@
-import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  useCallback,
+} from "react";
 import { api, setToken as setApiToken } from "../lib/api.js";
 import { useNavigate } from "react-router-dom";
 
@@ -11,7 +17,6 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const navigate = useNavigate();
 
-  // Load user and token from localStorage if exists
   const [user, setUser] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem("user") || "null");
@@ -29,7 +34,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Sync token with API interceptor
   useEffect(() => {
     setApiToken(token);
   }, [token]);
@@ -67,6 +71,20 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
   };
 
+  // ADD THE updateProfile FUNCTION HERE
+  const updateProfile = async (formData) => {
+    try {
+      const response = await api.put("/users/me", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setUser(response.data.user);
+      localStorage.setItem("user", JSON.stringify(response.data.user));
+      return response.data;
+    } catch (error) {
+      throw error;
+    }
+  };
+
   // Login
   const login = async (email, password, isAdminLogin = false) => {
     try {
@@ -79,11 +97,12 @@ export function AuthProvider({ children }) {
       }
 
       saveAuth(data.user, data.token);
-      navigate("/"); // redirect after login
+      navigate("/");
       return { success: true };
     } catch (error) {
       console.error("Login error:", error);
-      const message = error.response?.data?.message || error.message || "Login failed.";
+      const message =
+        error.response?.data?.message || error.message || "Login failed.";
       setError(message);
       return { success: false, message };
     } finally {
@@ -96,9 +115,13 @@ export function AuthProvider({ children }) {
     try {
       setLoading(true);
       setError("");
-      const { data } = await api.post("/auth/register", { username, email, password });
+      const { data } = await api.post("/auth/register", {
+        username,
+        email,
+        password,
+      });
       saveAuth(data.user, data.token);
-      navigate("/"); // redirect after register
+      navigate("/");
       return { success: true };
     } catch (error) {
       console.error("Registration error:", error);
@@ -113,7 +136,7 @@ export function AuthProvider({ children }) {
   const logout = () => {
     clearAuth();
     setError("");
-    navigate("/login"); // redirect after logout
+    navigate("/login");
   };
 
   const value = {
@@ -126,6 +149,7 @@ export function AuthProvider({ children }) {
     register,
     logout,
     refreshMe,
+    updateProfile,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
