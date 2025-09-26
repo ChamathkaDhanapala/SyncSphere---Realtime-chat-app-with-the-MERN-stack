@@ -1,182 +1,77 @@
 import User from "../models/User.js";
 
-export async function listUsers(req, res) {
+export const listUsers = async (req, res) => {
   try {
-    const users = await User.find({ _id: { $ne: req.user._id } })
-      .select("-password")
-      .sort({ online: -1, username: 1 });
+    console.log("📋 Fetching users list...");
+    
+    // Exclude the current user from the list
+    const users = await User.find({ _id: { $ne: req.user.id } })
+      .select("username avatarUrl bio isOnline lastSeen email")
+      .sort({ username: 1 });
+    
+    console.log(`✅ Found ${users.length} users`);
+    
     res.json(users);
-  } catch (e) {
-    res.status(500).json({ message: "Server error" });
+  } catch (error) {
+    console.error("❌ Error fetching users:", error);
+    res.status(500).json({ error: "Failed to fetch users" });
   }
-}
+};
 
 export const updateProfile = async (req, res) => {
   try {
-    console.log("=== BACKEND UPDATE PROFILE ===");
-    console.log("Request body:", req.body);
-    console.log("Request file:", req.file);
-    console.log("User ID:", req.user._id);
+    console.log("=== PROFILE UPDATE REQUEST ===");
+    console.log("📝 User ID:", req.user.id);
+    console.log("📋 Request body:", req.body);
+    console.log("📁 Uploaded file:", req.file);
 
     const { username, bio } = req.body;
-    const updates = {};
+    const userId = req.user.id;
 
-    if (username !== undefined && username.trim() !== "") {
-      updates.username = username.trim();
-
-      const existingUser = await User.findOne({
-        username: username.trim(),
-        _id: { $ne: req.user._id },
-      });
-
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
+    if (!username || username.trim() === "") {
+      return res.status(400).json({ error: "Username is required" });
     }
 
-    if (bio !== undefined) {
-      updates.bio = bio;
-    }
+    const updateData = {
+      username: username.trim(),
+      bio: bio ? bio.trim() : "",
+    };
 
     if (req.file) {
-      updates.avatarUrl = `/uploads/${req.file.filename}`;
-      console.log("New avatar URL:", updates.avatarUrl);
+      updateData.avatarUrl = `/uploads/${req.file.filename}`;
+      console.log("🖼️ Avatar set:", updateData.avatarUrl);
     }
 
-    console.log("Updates to apply:", updates);
-
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { $set: updates },
-      {
-        new: true,
-        runValidators: true,
-      }
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      updateData,
+      { new: true, runValidators: true }
     ).select("-password");
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    if (!updatedUser) {
+      return res.status(404).json({ error: "User not found" });
     }
 
-    console.log("Updated user:", user);
-
-    const userResponse = {
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      bio: user.bio,
-      avatarUrl: user.avatarUrl
-        ? `${user.avatarUrl}?t=${Date.now()}`
-        : user.avatarUrl,
-      online: user.online,
-      lastSeen: user.lastSeen,
-    };
     res.json({
+      user: updatedUser,
       message: "Profile updated successfully",
-      user: userResponse,
     });
+
   } catch (error) {
-    console.error("Profile update error:", error);
-
-    if (error.name === "ValidationError") {
-      const errors = Object.values(error.errors).map((val) => val.message);
-      return res.status(400).json({ message: "Validation error", errors });
-    }
-
-    if (error.code === 11000) {
-      return res.status(400).json({ message: "Username already exists" });
-    }
-
-    res.status(500).json({ message: "Server error updating profile" });
+    console.error("❌ updateProfile error:", error);
+    res.status(500).json({ error: "Internal server error", details: error.message });
   }
 };
 
-// Get all users for admin
-export const getAdminUsers = async (req, res) => {
+// Add the missing debugUser function
+export const debugUser = async (req, res) => {
   try {
-    console.log("Fetching all users for admin...");
-    
-    const users = await User.find().select('-password');
-    
-    console.log(`Found ${users.length} users`);
-    
+    const user = await User.findById(req.user.id).select("-password");
     res.json({
-      success: true,
-      users
+      user: user,
+      message: "Debug user info"
     });
   } catch (error) {
-    console.error('Get admin users error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error fetching users'
-    });
-  }
-};
-
-// Toggle user active status
-export const toggleUserStatus = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { isActive } = req.body;
-
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { isActive },
-      { new: true }
-    ).select('-password');
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
-      user
-    });
-  } catch (error) {
-    console.error('Toggle user status error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error updating user status'
-    });
-  }
-};
-
-// Delete user
-export const deleteUser = async (req, res) => {
-  try {
-    const { userId } = req.params;
-
-    // Prevent self-deletion
-    if (userId === req.user._id.toString()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Cannot delete your own account'
-      });
-    }
-
-    const user = await User.findByIdAndDelete(userId);
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    res.json({
-      success: true,
-      message: 'User deleted successfully'
-    });
-  } catch (error) {
-    console.error('Delete user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error deleting user'
-    });
+    res.status(500).json({ error: error.message });
   }
 };
