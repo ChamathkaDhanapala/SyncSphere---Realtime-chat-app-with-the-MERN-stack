@@ -1,32 +1,143 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
-export default function MessageInput({ onSend, onFileSend }) {
+export default function MessageInput({ onSend, onFileSend, socket, peer }) {
   const [text, setText] = useState("");
   const [isFileMenuOpen, setIsFileMenuOpen] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const fileInputRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // Handle typing events
+  useEffect(() => {
+    if (!socket || !peer) return;
+
+    const handleTyping = () => {
+      if (!isTyping) {
+        setIsTyping(true);
+        socket.emit("user:typing", {
+          to: peer._id,
+          isTyping: true,
+        });
+      }
+
+      // Clear existing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      // Set new timeout to stop typing indicator
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        socket.emit("user:typing", {
+          to: peer._id,
+          isTyping: false,
+        });
+      }, 1000); // Stop typing after 1 second of inactivity
+    };
+
+    // Cleanup on unmount
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, [socket, peer, isTyping]);
+
+  const handleTextChange = (e) => {
+    const newText = e.target.value;
+    setText(newText);
+
+    // Only emit typing if we have a socket, peer, and some text
+    if (socket && peer && newText.trim()) {
+      if (!isTyping) {
+        setIsTyping(true);
+        socket.emit("user:typing", {
+          to: peer._id,
+          isTyping: true,
+        });
+      }
+
+      // Reset the typing timeout
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+        socket.emit("user:typing", {
+          to: peer._id,
+          isTyping: false,
+        });
+      }, 1000);
+    } else if (isTyping) {
+      // If text is empty, stop typing
+      setIsTyping(false);
+      socket.emit("user:typing", {
+        to: peer._id,
+        isTyping: false,
+      });
+    }
+  };
 
   const handleSend = () => {
     if (!text.trim()) return;
+
+    // Stop typing when sending
+    if (isTyping && socket && peer) {
+      setIsTyping(false);
+      socket.emit("user:typing", {
+        to: peer._id,
+        isTyping: false,
+      });
+    }
+
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
     onSend(text.trim());
     setText("");
   };
 
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (onFileSend) {
-        onFileSend(file);
-      }
-      e.target.value = '';
+  const handleFileSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check file size (10MB limit)
+    if (file.size > 10 * 1024 * 1024) {
+      alert("File size too large. Please select a file smaller than 10MB.");
+      return;
     }
-    setIsFileMenuOpen(false);
+
+    // Check file type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/png",
+      "image/gif",
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      alert(
+        "File type not supported. Please select an image, PDF, or document file."
+      );
+      return;
+    }
+
+    console.log("📎 Selected file:", file.name, file.type, file.size);
+    onFileSend(file);
+
+    event.target.value = "";
   };
 
   const triggerFileInput = () => {
@@ -37,22 +148,15 @@ export default function MessageInput({ onSend, onFileSend }) {
     setIsFileMenuOpen(!isFileMenuOpen);
   };
 
-  const getFileTypeIcon = (fileType) => {
-    if (fileType.startsWith('image/')) return '🖼️';
-    if (fileType.startsWith('video/')) return '🎬';
-    if (fileType.startsWith('audio/')) return '🎵';
-    if (fileType.includes('pdf')) return '📄';
-    if (fileType.includes('zip') || fileType.includes('rar')) return '📦';
-    return '📎';
-  };
-
   return (
-    <div style={{
-      padding: "16px 20px",
-      borderTop: "1px solid #374151",
-      backgroundColor: "#1f2937",
-      position: "relative"
-    }}>
+    <div
+      style={{
+        padding: "16px 20px",
+        borderTop: "1px solid #374151",
+        backgroundColor: "#1f2937",
+        position: "relative",
+      }}
+    >
       {/* File Input (hidden) */}
       <input
         type="file"
@@ -64,29 +168,33 @@ export default function MessageInput({ onSend, onFileSend }) {
 
       {/* File Menu Popup */}
       {isFileMenuOpen && (
-        <div style={{
-          position: "absolute",
-          bottom: "100%",
-          left: "20px",
-          backgroundColor: "#374151",
-          border: "1px solid #4b5563",
-          borderRadius: "12px",
-          padding: "8px",
-          boxShadow: "0 10px 25px rgba(0, 0, 0, 0.3)",
-          zIndex: 1000,
-          minWidth: "150px"
-        }}>
-          <div style={{
-            color: "white",
-            fontSize: "14px",
-            fontWeight: "500",
-            padding: "8px 12px",
-            borderBottom: "1px solid #4b5563",
-            marginBottom: "4px"
-          }}>
+        <div
+          style={{
+            position: "absolute",
+            bottom: "100%",
+            left: "20px",
+            backgroundColor: "#374151",
+            border: "1px solid #4b5563",
+            borderRadius: "12px",
+            padding: "8px",
+            boxShadow: "0 10px 25px rgba(0, 0, 0, 0.3)",
+            zIndex: 1000,
+            minWidth: "150px",
+          }}
+        >
+          <div
+            style={{
+              color: "white",
+              fontSize: "14px",
+              fontWeight: "500",
+              padding: "8px 12px",
+              borderBottom: "1px solid #4b5563",
+              marginBottom: "4px",
+            }}
+          >
             Send File
           </div>
-          
+
           <button
             onClick={triggerFileInput}
             style={{
@@ -102,18 +210,19 @@ export default function MessageInput({ onSend, onFileSend }) {
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              transition: "background-color 0.2s"
+              transition: "background-color 0.2s",
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = "#4b5563"}
-            onMouseLeave={(e) => e.target.style.backgroundColor = "transparent"}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#4b5563")}
+            onMouseLeave={(e) =>
+              (e.target.style.backgroundColor = "transparent")
+            }
           >
             📎 File
           </button>
-          
+
           <button
             onClick={() => {
               triggerFileInput();
-              // Set accept to images only
               if (fileInputRef.current) {
                 fileInputRef.current.accept = "image/*";
               }
@@ -131,10 +240,12 @@ export default function MessageInput({ onSend, onFileSend }) {
               display: "flex",
               alignItems: "center",
               gap: "8px",
-              transition: "background-color 0.2s"
+              transition: "background-color 0.2s",
             }}
-            onMouseEnter={(e) => e.target.style.backgroundColor = "#4b5563"}
-            onMouseLeave={(e) => e.target.style.backgroundColor = "transparent"}
+            onMouseEnter={(e) => (e.target.style.backgroundColor = "#4b5563")}
+            onMouseLeave={(e) =>
+              (e.target.style.backgroundColor = "transparent")
+            }
           >
             🖼️ Photo
           </button>
@@ -158,10 +269,10 @@ export default function MessageInput({ onSend, onFileSend }) {
             alignItems: "center",
             justifyContent: "center",
             fontSize: "18px",
-            transition: "background-color 0.2s"
+            transition: "background-color 0.2s",
           }}
-          onMouseEnter={(e) => e.target.style.backgroundColor = "#4b5563"}
-          onMouseLeave={(e) => e.target.style.backgroundColor = "#374151"}
+          onMouseEnter={(e) => (e.target.style.backgroundColor = "#4b5563")}
+          onMouseLeave={(e) => (e.target.style.backgroundColor = "#374151")}
         >
           📎
         </button>
@@ -170,7 +281,7 @@ export default function MessageInput({ onSend, onFileSend }) {
         <input
           type="text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={handleTextChange}
           onKeyDown={handleKeyDown}
           placeholder="Type a message..."
           style={{
@@ -182,10 +293,10 @@ export default function MessageInput({ onSend, onFileSend }) {
             color: "white",
             fontSize: "14px",
             outline: "none",
-            transition: "border-color 0.2s"
+            transition: "border-color 0.2s",
           }}
-          onFocus={(e) => e.target.style.borderColor = "#3b82f6"}
-          onBlur={(e) => e.target.style.borderColor = "#4b5563"}
+          onFocus={(e) => (e.target.style.borderColor = "#3b82f6")}
+          onBlur={(e) => (e.target.style.borderColor = "#4b5563")}
         />
 
         {/* Send Button */}
@@ -201,7 +312,7 @@ export default function MessageInput({ onSend, onFileSend }) {
             cursor: text.trim() ? "pointer" : "not-allowed",
             opacity: text.trim() ? 1 : 0.5,
             fontWeight: "500",
-            transition: "background-color 0.2s"
+            transition: "background-color 0.2s",
           }}
           onMouseEnter={(e) => {
             if (text.trim()) e.target.style.backgroundColor = "#2563eb";
@@ -223,7 +334,7 @@ export default function MessageInput({ onSend, onFileSend }) {
             left: 0,
             right: 0,
             bottom: 0,
-            zIndex: 999
+            zIndex: 999,
           }}
           onClick={() => setIsFileMenuOpen(false)}
         />
