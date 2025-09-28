@@ -13,7 +13,7 @@ import {
   InputAdornment,
   IconButton
 } from "@mui/material";
-import { Visibility, VisibilityOff, Lock, Email } from "@mui/icons-material";
+import { Visibility, VisibilityOff, Lock, Email, Message } from "@mui/icons-material";
 
 export default function Login() {
   const nav = useNavigate();
@@ -57,7 +57,7 @@ export default function Login() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #e6e6fa 0%, #d8bfd8 50%, #b0c4de 100%)",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -73,7 +73,7 @@ export default function Login() {
           width: "300px",
           height: "300px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(128, 0, 128, 0.15) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)",
           animation: "float 15s infinite ease-in-out",
         },
         "&::after": {
@@ -84,7 +84,7 @@ export default function Login() {
           width: "400px",
           height: "400px",
           borderRadius: "50%",
-          background: "radial-gradient(circle, rgba(0, 0, 255, 0.1) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(139, 92, 246, 0.05) 0%, transparent 70%)",
           animation: "float 18s infinite ease-in-out reverse",
         },
         "@keyframes float": {
@@ -93,22 +93,24 @@ export default function Login() {
         }
       }}
     >
-      <Container component="main" maxWidth="sm">
+      <Container component="main" maxWidth="xs"> {/* Changed to xs for smaller width */}
         <Paper
-          elevation={24}
           sx={{
-            p: 4,
-            background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)",
-            borderRadius: 3,
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(75, 0, 130, 0.5)",
+            p: 3, // Reduced padding
+            background: "rgba(30, 41, 59, 0.95)",
+            backdropFilter: "blur(20px)",
+            borderRadius: "16px",
+            border: "1px solid rgba(255, 255, 255, 0.1)",
             color: "white",
             position: "relative",
             zIndex: 1,
-            boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5), 0 0 20px rgba(75, 0, 130, 0.4)",
-            transform: "transition-all duration-300",
+            boxShadow: 
+              "0 20px 40px rgba(0, 0, 0, 0.4), 0 0 80px rgba(59, 130, 246, 0.2)",
+            transition: "all 0.3s ease",
             "&:hover": {
-              transform: "scale(1.02)",
+              transform: "translateY(-2px)",
+              boxShadow: 
+                "0 25px 50px rgba(0, 0, 0, 0.5), 0 0 100px rgba(59, 130, 246, 0.3)",
             }
           }}
         >
@@ -117,43 +119,55 @@ export default function Login() {
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              mb: 3
+              mb: 2 // Reduced margin
             }}
           >
             <Box
               sx={{
-                width: 70,
-                height: 70,
-                background: "linear-gradient(135deg, #4b0082 0%, #000080 100%)",
-                borderRadius: "50%",
+                width: 60, // Smaller icon
+                height: 60,
+                background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                borderRadius: "16px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                mb: 2,
-                boxShadow: "0 0 20px rgba(75, 0, 130, 0.5)"
+                mb: 1.5,
+                boxShadow: 
+                  "0 8px 20px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+                animation: "iconFloat 3s ease-in-out infinite",
+                "@keyframes iconFloat": {
+                  "0%, 100%": { transform: "translateY(0)" },
+                  "50%": { transform: "translateY(-5px)" },
+                }
               }}
             >
-              <Lock sx={{ color: "white", fontSize: 30 }} />
+              <Message sx={{ color: "white", fontSize: 28 }} />
             </Box>
-            <Typography component="h1" variant="h4" sx={{ 
+            <Typography component="h1" variant="h5" sx={{ 
               fontWeight: 700, 
-              color: "white",
-              mb: 1,
-              textShadow: "0 0 10px rgba(75, 0, 130, 0.5)"
+              background: "linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              mb: 0.5,
             }}>
               Welcome Back
             </Typography>
-            <Typography variant="body2" sx={{ color: "#a0a0d0" }}>
+            <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "0.9rem" }}>
               Sign in to continue your conversations
             </Typography>
           </Box>
 
           {error && (
             <Alert severity="error" sx={{ 
-              mb: 3, 
-              backgroundColor: "rgba(211, 47, 47, 0.2)",
-              color: "#ff8a8a",
-              border: "1px solid rgba(211, 47, 47, 0.3)"
+              mb: 2, 
+              backgroundColor: "rgba(239, 68, 68, 0.15)",
+              backdropFilter: "blur(10px)",
+              border: "1px solid rgba(239, 68, 68, 0.3)",
+              borderRadius: "10px",
+              color: "#fca5a5",
+              fontSize: "0.9rem",
+              py: 0.5
             }}>
               {error}
             </Alert>
@@ -174,31 +188,44 @@ export default function Login() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Email sx={{ color: "#6a5acd" }} />
+                    <Email sx={{ color: "#60a5fa" }} />
                   </InputAdornment>
                 ),
               }}
               sx={{
-                mb: 2,
+                mb: 1.5,
                 "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  backgroundColor: "rgba(40, 40, 70, 0.7)",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(59, 130, 246, 0.1)", // Blue tint background
+                  backdropFilter: "blur(10px)",
                   color: "white",
                   "& fieldset": {
-                    borderColor: "#6a5acd",
+                    borderColor: "rgba(59, 130, 246, 0.3)",
                   },
                   "&:hover fieldset": {
-                    borderColor: "#9370db",
+                    borderColor: "rgba(59, 130, 246, 0.6)",
+                    backgroundColor: "rgba(59, 130, 246, 0.15)",
                   },
                   "&.Mui-focused fieldset": {
-                    borderColor: "#7b68ee",
+                    borderColor: "#3b82f6",
+                    backgroundColor: "rgba(59, 130, 246, 0.2)",
+                    boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.1)",
                   },
                 },
                 "& .MuiInputLabel-root": {
-                  color: "#b0b0e0",
+                  color: "rgba(255, 255, 255, 0.8)",
+                  fontWeight: 500,
+                  fontSize: "0.9rem",
                 },
                 "& .MuiInputLabel-root.Mui-focused": {
-                  color: "#7b68ee",
+                  color: "#3b82f6",
+                },
+                "& .MuiOutlinedInput-input": {
+                  color: "white",
+                  fontSize: "0.9rem",
+                  "&::placeholder": {
+                    color: "rgba(255, 255, 255, 0.5)",
+                  }
                 }
               }}
             />
@@ -216,7 +243,7 @@ export default function Login() {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Lock sx={{ color: "#6a5acd" }} />
+                    <Lock sx={{ color: "#60a5fa" }} />
                   </InputAdornment>
                 ),
                 endAdornment: (
@@ -225,7 +252,7 @@ export default function Login() {
                       aria-label="toggle password visibility"
                       onClick={handleClickShowPassword}
                       edge="end"
-                      sx={{ color: "#6a5acd" }}
+                      sx={{ color: "#60a5fa" }}
                     >
                       {formData.showPassword ? <VisibilityOff /> : <Visibility />}
                     </IconButton>
@@ -233,26 +260,39 @@ export default function Login() {
                 ),
               }}
               sx={{
-                mb: 3,
+                mb: 2,
                 "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
-                  backgroundColor: "rgba(40, 40, 70, 0.7)",
+                  borderRadius: "10px",
+                  backgroundColor: "rgba(59, 130, 246, 0.1)", // Blue tint background
+                  backdropFilter: "blur(10px)",
                   color: "white",
                   "& fieldset": {
-                    borderColor: "#6a5acd",
+                    borderColor: "rgba(59, 130, 246, 0.3)",
                   },
                   "&:hover fieldset": {
-                    borderColor: "#9370db",
+                    borderColor: "rgba(59, 130, 246, 0.6)",
+                    backgroundColor: "rgba(59, 130, 246, 0.15)",
                   },
                   "&.Mui-focused fieldset": {
-                    borderColor: "#7b68ee",
+                    borderColor: "#3b82f6",
+                    backgroundColor: "rgba(59, 130, 246, 0.2)",
+                    boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.1)",
                   },
                 },
                 "& .MuiInputLabel-root": {
-                  color: "#b0b0e0",
+                  color: "rgba(255, 255, 255, 0.8)",
+                  fontWeight: 500,
+                  fontSize: "0.9rem",
                 },
                 "& .MuiInputLabel-root.Mui-focused": {
-                  color: "#7b68ee",
+                  color: "#3b82f6",
+                },
+                "& .MuiOutlinedInput-input": {
+                  color: "white",
+                  fontSize: "0.9rem",
+                  "&::placeholder": {
+                    color: "rgba(255, 255, 255, 0.5)",
+                  }
                 }
               }}
             />
@@ -262,38 +302,56 @@ export default function Login() {
               variant="contained"
               disabled={loading}
               sx={{
-                mt: 2,
-                mb: 2,
-                py: 1.5,
-                borderRadius: 2,
-                background: "linear-gradient(90deg, #4b0082 0%, #000080 100%)",
-                fontSize: "1rem",
+                mt: 1,
+                mb: 1.5,
+                py: 1,
+                borderRadius: "10px",
+                background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                fontSize: "0.9rem",
                 fontWeight: 600,
-                boxShadow: "0 4px 14px 0 rgba(75, 0, 130, 0.5)",
+                textTransform: "none",
+                boxShadow: 
+                  "0 4px 12px rgba(59, 130, 246, 0.4)",
+                transition: "all 0.3s ease",
+                position: "relative",
+                overflow: "hidden",
                 "&:hover": {
-                  background: "linear-gradient(90deg, #000080 0%, #4b0082 100%)",
-                  boxShadow: "0 6px 20px 0 rgba(75, 0, 130, 0.7)",
+                  background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)",
+                  boxShadow: 
+                    "0 6px 20px rgba(59, 130, 246, 0.6)",
                   transform: "translateY(-1px)",
                 },
                 "&:active": {
                   transform: "translateY(0)",
                 },
-                transition: "all 0.3s ease",
+                "&::before": {
+                  content: '""',
+                  position: "absolute",
+                  top: 0,
+                  left: "-100%",
+                  width: "100%",
+                  height: "100%",
+                  background: "linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent)",
+                  transition: "left 0.5s",
+                },
+                "&:hover::before": {
+                  left: "100%",
+                }
               }}
             >
               {loading ? (
-                <CircularProgress size={24} sx={{ color: "white" }} />
+                <CircularProgress size={20} sx={{ color: "white" }} />
               ) : (
                 "Sign In"
               )}
             </Button>
             <Box sx={{ textAlign: "center" }}>
-              <Typography variant="body2" sx={{ color: "#b0b0e0" }}>
+              <Typography variant="body2" sx={{ color: "rgba(255, 255, 255, 0.7)", fontSize: "0.8rem" }}>
                 Don't have an account?{" "}
                 <Link
                   to="/register"
                   style={{
-                    color: "#9370db",
+                    color: "#60a5fa",
                     textDecoration: "none",
                     fontWeight: 600,
                   }}
@@ -305,21 +363,24 @@ export default function Login() {
           </Box>
 
           <Box sx={{ 
-            mt: 3, 
-            pt: 2, 
-            borderTop: "1px solid", 
-            borderColor: "rgba(75, 0, 130, 0.3)" 
+            mt: 2, 
+            pt: 1.5, 
+            borderTop: "1px solid rgba(255, 255, 255, 0.1)", 
           }}>
-            <Typography variant="caption" display="block" align="center" sx={{ color: "#b0b0e0" }}>
-              <Link href="#" style={{ color: "#9370db", textDecoration: "none" }}>
+            <Typography variant="caption" display="block" align="center" sx={{ color: "rgba(255, 255, 255, 0.5)", fontSize: "0.75rem" }}>
+              <Link href="#" style={{ 
+                color: "#60a5fa", 
+                textDecoration: "none",
+                fontWeight: 600,
+              }}>
                 Forgot password?
               </Link>
             </Typography>
           </Box>
         </Paper>
 
-        <Box sx={{ mt: 2 }}>
-          <Typography variant="body2" align="center" sx={{ color: "rgba(80, 80, 120, 0.8)" }}>
+        <Box sx={{ mt: 1.5 }}>
+          <Typography variant="body2" align="center" sx={{ color: "rgba(255, 255, 255, 0.4)", fontSize: "0.75rem" }}>
             © 2024 SyncSphere. All rights reserved.
           </Typography>
         </Box>
