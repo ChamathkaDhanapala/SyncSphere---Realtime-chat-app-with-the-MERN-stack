@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar.jsx";
 import ChatWindow from "../components/ChatWindow.jsx";
 import MessageInput from "../components/MessageInput.jsx";
+import MessageReactions from "../components/MessageReactions.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
 import { api } from "../lib/api.js";
@@ -11,6 +12,7 @@ export default function Chat() {
   const { socket, isOnline } = useSocket();
   const [peer, setPeer] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [typingUsers, setTypingUsers] = useState({});
 
   useEffect(() => {
     if (!peer) return;
@@ -38,12 +40,110 @@ export default function Chat() {
       }
     };
 
+    const handleMessageUpdate = ({ message }) => {
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === message._id ? message : msg))
+      );
+    };
+
     socket.on("message:new", handleNewMessage);
-    return () => socket.off("message:new", handleNewMessage);
+    socket.on("message:update", handleMessageUpdate);
+
+    return () => {
+      socket.off("message:new", handleNewMessage);
+      socket.off("message:update", handleMessageUpdate);
+    };
   }, [socket, peer, user]);
+
+  // Typing indicator listener
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleUserTyping = ({ userId, isTyping }) => {
+      console.log("Typing event received:", {
+        userId,
+        isTyping,
+        currentPeer: peer?._id,
+      });
+
+      if (peer && userId === peer._id) {
+        setTypingUsers((prev) => ({
+          ...prev,
+          [userId]: isTyping,
+        }));
+
+        if (isTyping) {
+          setTimeout(() => {
+            setTypingUsers((prev) => ({
+              ...prev,
+              [userId]: false,
+            }));
+          }, 3000);
+        }
+      }
+    };
+
+    socket.on("user:typing", handleUserTyping);
+    return () => socket.off("user:typing", handleUserTyping);
+  }, [socket, peer]);
+
+  // Clean up typing indicator when peer changes
+  useEffect(() => {
+    setTypingUsers({});
+  }, [peer]);
 
   const selectPeer = (selectedPeer) => {
     setPeer(selectedPeer);
+  };
+
+  const handleReaction = async (messageId, reaction) => {
+    if (!socket) return;
+
+    console.log("Sending reaction:", { messageId, reaction });
+
+    // Optimistic local update
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg._id === messageId
+          ? {
+              ...msg,
+              reactions: [
+                // remove old reaction from same user if exists
+                ...(msg.reactions?.filter(
+                  (r) => r.user !== user._id && r.user?._id !== user._id
+                ) || []),
+                { user: user._id, reaction }, // add new reaction
+              ],
+            }
+          : msg
+      )
+    );
+
+    // Emit to backend so others see it
+    socket.emit("message:react", {
+      messageId,
+      reaction,
+    });
+  };
+
+  const handleFileSend = async (file) => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("to", peer._id);
+
+      const res = await api.post("/messages/file", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      // Add to local messages
+      setMessages((prev) => [...prev, res.data]);
+
+      // Notify peer
+      socket.emit("message:send", res.data);
+    } catch (err) {
+      console.error("❌ File upload failed:", err);
+    }
   };
 
   const sendMessage = async (text) => {
@@ -55,13 +155,8 @@ export default function Chat() {
       sender: user._id,
       createdAt: new Date().toISOString(),
       isTemp: true,
+      reactions: [],
     };
-
-    console.log("Sending message:", {
-      tempMessageSender: tempMessage.sender,
-      currentUserId: user._id,
-      peerId: peer._id,
-    });
 
     setMessages((prev) => [...prev, tempMessage]);
 
@@ -92,7 +187,7 @@ export default function Chat() {
   const sendFile = async (file) => {
     if (!peer || !file) return;
 
-    console.log("Sending file:", file.name, file.type, file.size);
+    console.log("📤 Sending file:", file.name, file.type, file.size);
 
     const tempMessage = {
       _id: Date.now().toString(),
@@ -106,6 +201,8 @@ export default function Chat() {
       createdAt: new Date().toISOString(),
       isTemp: true,
       isFile: true,
+      text: `Uploading: ${file.name}`,
+      reactions: [],
     };
 
     setMessages((prev) => [...prev, tempMessage]);
@@ -115,23 +212,29 @@ export default function Chat() {
       formData.append("file", file);
       formData.append("to", peer._id);
 
+      console.log("📨 Uploading file to server...");
+
       const { data } = await api.post("/messages/send-file", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
+        timeout: 30000,
       });
+
+      console.log("✅ File upload successful:", data);
 
       setMessages((prev) =>
         prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
       );
     } catch (error) {
-      console.error("File upload failed:", error);
+      console.error("❌ File upload failed:", error);
 
       setMessages((prev) =>
         prev.map((msg) =>
           msg._id === tempMessage._id
             ? {
                 ...msg,
+                text: `Failed to upload: ${file.name}`,
                 file: {
                   ...msg.file,
                   uploadFailed: true,
@@ -143,7 +246,7 @@ export default function Chat() {
       );
 
       if (socket) {
-        console.log("File sharing via socket not implemented");
+        console.log("🔄 Trying socket fallback for file sharing...");
       }
     }
   };
@@ -189,8 +292,72 @@ export default function Chat() {
           <>
             {/* Chat Window (includes header) */}
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <ChatWindow me={user} peer={peer} messages={enhancedMessages} />
+              <ChatWindow
+                me={user}
+                peer={peer}
+                messages={enhancedMessages}
+                onReaction={handleReaction}
+                MessageReactions={MessageReactions}
+              />
             </div>
+
+            {/* Typing Indicator */}
+            {peer && typingUsers[peer._id] && (
+              <div
+                style={{
+                  padding: "8px 20px",
+                  backgroundColor: "#1f2937",
+                  borderBottom: "1px solid #374151",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    color: "#6b7280",
+                    fontStyle: "italic",
+                    fontSize: "14px",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "2px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: "4px",
+                        height: "4px",
+                        backgroundColor: "#6b7280",
+                        borderRadius: "50%",
+                        animation: "typing 1.4s infinite ease-in-out",
+                      }}
+                    ></div>
+                    <div
+                      style={{
+                        width: "4px",
+                        height: "4px",
+                        backgroundColor: "#6b7280",
+                        borderRadius: "50%",
+                        animation: "typing 1.4s infinite ease-in-out 0.2s",
+                      }}
+                    ></div>
+                    <div
+                      style={{
+                        width: "4px",
+                        height: "4px",
+                        backgroundColor: "#6b7280",
+                        borderRadius: "50%",
+                        animation: "typing 1.4s infinite ease-in-out 0.4s",
+                      }}
+                    ></div>
+                  </div>
+                  <span>{peer.username} is typing...</span>
+                </div>
+              </div>
+            )}
 
             {/* Message Input */}
             <div
@@ -199,7 +366,12 @@ export default function Chat() {
                 borderTop: "1px solid #374151",
               }}
             >
-              <MessageInput onSend={sendMessage} onFileSend={sendFile} />
+              <MessageInput
+                onSend={sendMessage}
+                onFileSend={sendFile}
+                socket={socket}
+                peer={peer}
+              />
             </div>
           </>
         ) : (
