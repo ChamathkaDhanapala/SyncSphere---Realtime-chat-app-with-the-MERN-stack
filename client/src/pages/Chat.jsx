@@ -89,6 +89,75 @@ export default function Chat() {
     }
   };
 
+  const sendFile = async (file) => {
+    if (!peer || !file) return;
+
+    console.log("Sending file:", file.name, file.type, file.size);
+
+    const tempMessage = {
+      _id: Date.now().toString(),
+      file: {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        isUploading: true,
+      },
+      sender: user._id,
+      createdAt: new Date().toISOString(),
+      isTemp: true,
+      isFile: true,
+    };
+
+    setMessages((prev) => [...prev, tempMessage]);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("to", peer._id);
+
+      const { data } = await api.post("/messages/send-file", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      });
+
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
+      );
+    } catch (error) {
+      console.error("File upload failed:", error);
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === tempMessage._id
+            ? {
+                ...msg,
+                file: {
+                  ...msg.file,
+                  uploadFailed: true,
+                  error: error.response?.data?.message || "Upload failed",
+                },
+              }
+            : msg
+        )
+      );
+
+      if (socket) {
+        console.log("File sharing via socket not implemented");
+      }
+    }
+  };
+
+  const enhancedMessages = messages.map((msg) => {
+    if (msg.isFile && msg.file) {
+      return {
+        ...msg,
+        text: `File: ${msg.file.name}`,
+      };
+    }
+    return msg;
+  });
+
   return (
     <div
       style={{
@@ -118,86 +187,9 @@ export default function Chat() {
       >
         {peer ? (
           <>
-            {/* Chat Header */}
-            <div
-              style={{
-                padding: "16px 24px",
-                backgroundColor: "#1f2937",
-                borderBottom: "1px solid #374151",
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-              }}
-            >
-              <div style={{ position: "relative" }}>
-                <div
-                  style={{
-                    width: "48px",
-                    height: "48px",
-                    borderRadius: "50%",
-                    backgroundColor: "#3b82f6",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "white",
-                    fontWeight: "bold",
-                    fontSize: "18px",
-                  }}
-                >
-                  {peer.username?.charAt(0)?.toUpperCase()}
-                </div>
-                {isOnline(peer._id) && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: "2px",
-                      right: "2px",
-                      width: "12px",
-                      height: "12px",
-                      backgroundColor: "#10b981",
-                      border: "2px solid #1f2937",
-                      borderRadius: "50%",
-                    }}
-                  />
-                )}
-              </div>
-              <div>
-                <div
-                  style={{
-                    color: "white",
-                    fontWeight: "600",
-                    fontSize: "16px",
-                  }}
-                >
-                  {peer.username}
-                </div>
-                <div
-                  style={{
-                    color: isOnline(peer._id) ? "#10b981" : "#9ca3af",
-                    fontSize: "14px",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "4px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "6px",
-                      height: "6px",
-                      backgroundColor: isOnline(peer._id)
-                        ? "#10b981"
-                        : "#9ca3af",
-                      borderRadius: "50%",
-                    }}
-                  />
-                  {isOnline(peer._id) ? "Online" : "Offline"}
-                </div>
-              </div>
-            </div>
-
-            {/* Chat Window */}
+            {/* Chat Window (includes header) */}
             <div style={{ flex: 1, overflow: "hidden" }}>
-              <ChatWindow me={user} peer={peer} messages={messages} />
+              <ChatWindow me={user} peer={peer} messages={enhancedMessages} />
             </div>
 
             {/* Message Input */}
@@ -207,7 +199,7 @@ export default function Chat() {
                 borderTop: "1px solid #374151",
               }}
             >
-              <MessageInput onSend={sendMessage} />
+              <MessageInput onSend={sendMessage} onFileSend={sendFile} />
             </div>
           </>
         ) : (
