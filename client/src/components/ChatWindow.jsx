@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import InfoComponent from "./InfoComponent"; 
+import MessageReactions from "./MessageReactions";
 
-export default function ChatWindow({ me, peer, messages }) {
+export default function ChatWindow({ me, peer, messages, onReaction }) {
   const endRef = useRef(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [openReactionMenu, setOpenReactionMenu] = useState(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -18,17 +20,13 @@ export default function ChatWindow({ me, peer, messages }) {
 
   const getAvatarUrl = (user, size = 32) => {
     if (!user?.avatarUrl) return null;
-    
     let avatarUrl = user.avatarUrl;
-    
     if (!avatarUrl.startsWith('http')) {
       avatarUrl = `http://localhost:5000${avatarUrl.startsWith('/') ? '' : '/'}${avatarUrl}`;
     }
-    
     return avatarUrl;
   };
 
-  // Avatar component
   const Avatar = ({ user, size = 32, onClick }) => {
     const [imageError, setImageError] = useState(false);
     const avatarUrl = getAvatarUrl(user);
@@ -75,6 +73,29 @@ export default function ChatWindow({ me, peer, messages }) {
     );
   };
 
+  const handleToggleReaction = (messageId, e) => {
+    if (e) e.stopPropagation();
+    setOpenReactionMenu(openReactionMenu === messageId ? null : messageId);
+  };
+
+  const handleReactionSelect = (messageId, reaction) => {
+    console.log("Reaction selected:", messageId, reaction);
+    onReaction(messageId, reaction);
+    setOpenReactionMenu(null);
+  };
+
+
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setOpenReactionMenu(null);
+    };
+
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
+
   return (
     <>
       <div
@@ -85,7 +106,7 @@ export default function ChatWindow({ me, peer, messages }) {
           backgroundColor: "#0f172a",
         }}
       >
-        {/* Chat Header with Peer Info */}
+        {/* Chat Header */}
         <div
           style={{
             padding: "16px",
@@ -121,6 +142,7 @@ export default function ChatWindow({ me, peer, messages }) {
             flexDirection: "column",
             gap: "12px",
           }}
+          onClick={() => setOpenReactionMenu(null)} // Close menu when clicking in messages area
         >
           {messages.map((msg) => {
             let senderId = msg.sender;
@@ -129,6 +151,7 @@ export default function ChatWindow({ me, peer, messages }) {
             }
 
             const isOwnMessage = senderId === me?._id;
+            const hasReactions = msg.reactions && msg.reactions.length > 0;
 
             return (
               <div
@@ -140,50 +163,149 @@ export default function ChatWindow({ me, peer, messages }) {
                   justifyContent: isOwnMessage ? "flex-end" : "flex-start",
                 }}
               >
-                {/* Avatar for peer messages (left side) */}
-                {!isOwnMessage && (
-                  <Avatar user={peer} size={32} />
-                )}
+                {/* Avatar for peer messages */}
+                {!isOwnMessage && <Avatar user={peer} size={32} />}
 
-                {/* Message Bubble */}
+                {/* Message Bubble Container */}
                 <div
                   style={{
                     maxWidth: "70%",
                     display: "flex",
                     flexDirection: "column",
-                    gap: "4px",
+                    gap: "2px",
                     alignItems: isOwnMessage ? "flex-end" : "flex-start",
+                    position: 'relative'
                   }}
                 >
-                  {/* Sender Name for peer messages */}
+                  {/* Sender Name */}
                   {!isOwnMessage && (
-                    <div style={{ color: "#9ca3af", fontSize: "12px", paddingLeft: "8px" }}>
+                    <div style={{ color: "#9ca3af", fontSize: "12px", paddingLeft: "12px" }}>
                       {peer?.username}
                     </div>
                   )}
 
-                  {/* Message Content */}
-                  <div
-                    style={{
-                      padding: "12px 16px",
-                      borderRadius: "18px",
-                      backgroundColor: isOwnMessage ? "#3b82f6" : "#374151",
-                      color: "white",
-                      borderBottomRightRadius: isOwnMessage ? "4px" : "18px",
-                      borderBottomLeftRadius: isOwnMessage ? "18px" : "4px",
-                    }}
-                  >
-                    <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
-                      {msg.text}
+                  {/* Message Bubble with Reaction Trigger */}
+                  <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: isOwnMessage ? 'flex-end' : 'flex-start' }}>
+                    <div
+                      style={{
+                        padding: "12px 16px",
+                        borderRadius: "18px",
+                        backgroundColor: isOwnMessage ? "#3b82f6" : "#374151",
+                        color: "white",
+                        borderBottomRightRadius: isOwnMessage ? "4px" : "18px",
+                        borderBottomLeftRadius: isOwnMessage ? "18px" : "4px",
+                        position: 'relative',
+                        cursor: 'pointer'
+                      }}
+                      onMouseEnter={(e) => {
+                        // Show reaction trigger on hover
+                        const trigger = e.currentTarget.querySelector('.reaction-trigger');
+                        if (trigger) trigger.style.opacity = '1';
+                      }}
+                      onMouseLeave={(e) => {
+                        // Hide reaction trigger if menu not open
+                        const trigger = e.currentTarget.querySelector('.reaction-trigger');
+                        if (trigger && openReactionMenu !== msg._id) {
+                          trigger.style.opacity = '0';
+                        }
+                      }}
+                    >
+                      <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
+                        {msg.text}
+                      </div>
+
+                      {/* Reaction Trigger */}
+                      <button
+                        className="reaction-trigger"
+                        onClick={(e) => handleToggleReaction(msg._id, e)}
+                        style={{
+                          position: 'absolute',
+                          top: '50%',
+                          [isOwnMessage ? 'left' : 'right']: '-24px',
+                          transform: 'translateY(-50%)',
+                          background: '#1f2937',
+                          border: '1px solid #374151',
+                          color: '#9ca3af',
+                          cursor: 'pointer',
+                          fontSize: '16px',
+                          opacity: 0,
+                          transition: 'opacity 0.2s',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          zIndex: 10
+                        }}
+                      >
+                        ♥
+                      </button>
                     </div>
+
+                    {/* Reaction Picker Menu */}
+                    {openReactionMenu === msg._id && (
+                      <div style={{ 
+                        position: 'absolute', 
+                        bottom: '100%', 
+                        [isOwnMessage ? 'right' : 'left']: '0',
+                        marginBottom: '8px',
+                        zIndex: 1000
+                      }}>
+                        <MessageReactions
+                          message={msg}
+                          onReact={handleReactionSelect}
+                          currentUserId={me._id}
+                          isOpen={true}
+                          onToggle={() => handleToggleReaction(msg._id)}
+                          position={isOwnMessage ? 'right' : 'left'}
+                        />
+                      </div>
+                    )}
                   </div>
+
+                  {/* Display Existing Reactions */}
+                  {hasReactions && (
+                    <div style={{ 
+                      display: 'flex', 
+                      gap: '4px', 
+                      flexWrap: 'wrap',
+                      marginTop: '2px',
+                      padding: '0 4px'
+                    }}>
+                      {Object.entries(
+                        msg.reactions.reduce((acc, reaction) => {
+                          const reactionType = reaction.reaction;
+                          acc[reactionType] = (acc[reactionType] || 0) + 1;
+                          return acc;
+                        }, {})
+                      ).map(([reaction, count]) => (
+                        <div
+                          key={reaction}
+                          style={{
+                            backgroundColor: '#1f2937',
+                            padding: '2px 6px',
+                            borderRadius: '12px',
+                            fontSize: '12px',
+                            border: '1px solid #374151',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}
+                        >
+                          <span>{reaction}</span>
+                          {count > 1 && <span style={{ fontSize: '10px' }}>{count}</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Time Stamp */}
                   <div
                     style={{
                       fontSize: "11px",
                       color: "#9ca3af",
-                      padding: "0 8px",
+                      padding: "0 12px",
                     }}
                   >
                     {formatTime(msg.createdAt)}
@@ -191,10 +313,8 @@ export default function ChatWindow({ me, peer, messages }) {
                   </div>
                 </div>
 
-                {/* Avatar for own messages (right side) */}
-                {isOwnMessage && (
-                  <Avatar user={me} size={32} />
-                )}
+                {/* Avatar for own messages */}
+                {isOwnMessage && <Avatar user={me} size={32} />}
               </div>
             );
           })}
