@@ -3,10 +3,13 @@ import User from "./models/User.js";
 import Conversation from "./models/Conversation.js";
 import Message from "./models/Message.js";
 
-// In-memory online users map: userId -> socket.id
 const onlineUsers = new Map();
 
 export function setupSocket(io) {
+  // Make io available globally for routes
+  global.io = io;
+  global.onlineUsers = onlineUsers;
+
   io.use(async (socket, next) => {
     try {
       const token = socket.handshake.auth?.token;
@@ -25,143 +28,323 @@ export function setupSocket(io) {
     await User.findByIdAndUpdate(userId, { online: true });
     io.emit("presence:update", { userId, online: true });
 
+    console.log(`🟢 User ${userId} connected. Socket: ${socket.id}`);
+    console.log("📊 Online users:", Array.from(onlineUsers.entries()));
+
+    // --- Send Message ---
     socket.on("message:send", async ({ to, text }) => {
+      console.log(
+        "🔵 BACKEND: Message received from:",
+        socket.userId,
+        "to:",
+        to
+      );
+
       if (!to || !text) return;
 
-      // Find or create conversation between {userId, to}
-      let convo = await Conversation.findOne({
-        participants: { $all: [userId, to] },
-      });
-      if (!convo) {
-        convo = await Conversation.create({ participants: [userId, to] });
-      }
+      try {
+        let convo = await Conversation.findOne({
+          participants: { $all: [socket.userId, to] },
+        });
+        if (!convo) {
+          convo = await Conversation.create({
+            participants: [socket.userId, to],
+          });
+        }
 
-      const msg = await Message.create({
-        conversation: convo._id,
-        sender: userId,
-        text,
-        seenBy: [userId],
-        reactions: [],
-      });
+        const msg = await Message.create({
+          conversation: convo._id,
+          sender: socket.userId,
+          text,
+          seenBy: [socket.userId],
+          reactions: [],
+        });
 
-      convo.latestMessage = msg._id;
-      await convo.save();
+        convo.latestMessage = msg._id;
+        await convo.save();
 
-      // Emit to sender
-      io.to(socket.id).emit("message:new", { message: msg });
+        // Populate sender info
+        const populatedMessage = await Message.findById(msg._id).populate(
+          "sender",
+          "username avatarUrl"
+        );
 
-      // Emit to receiver if online
-      const toSocket = onlineUsers.get(to.toString());
-      if (toSocket) {
-        io.to(toSocket).emit("message:new", { message: msg });
+        console.log("📨 BACKEND: Message created:", populatedMessage._id);
+
+        // Emit to sender
+        io.to(socket.id).emit("message:new", { message: populatedMessage });
+        console.log("📤 BACKEND: Message sent to sender:", socket.userId);
+
+        // Emit to receiver
+        const receiverId = to.toString();
+        const toSocket = onlineUsers.get(receiverId);
+
+        if (toSocket) {
+          io.to(toSocket).emit("message:new", { message: populatedMessage });
+          console.log("📤 BACKEND: Message sent to receiver:", receiverId);
+
+          // Send notification
+          io.to(toSocket).emit("message:notification", {
+            message: populatedMessage,
+            type: "new_message",
+          });
+          console.log("📢 BACKEND: Notification sent to:", receiverId);
+        } else {
+          console.log("❌ BACKEND: Receiver not online");
+        }
+      } catch (error) {
+        console.error("❌ Message send error:", error);
       }
     });
 
-    // Add reaction handler
+    // --- React to Message ---
     socket.on("message:react", async ({ messageId, reaction }) => {
-      console.log("🔵 BACKEND: Received reaction:", {
-        messageId,
-        reaction,
-        userId: socket.userId,
-      });
-
       try {
         const message = await Message.findById(messageId).populate(
           "reactions.user"
         );
         if (!message) {
-          console.log("❌ Message not found:", messageId);
+          console.log("❌ Message not found for reaction:", messageId);
           return;
         }
 
-        console.log(
-          "📝 Found message:",
-          message._id,
-          "Current reactions:",
-          message.reactions
-        );
-
-        // Find if user already reacted
         const existingReactionIndex = message.reactions.findIndex(
           (r) => r.user._id.toString() === socket.userId
         );
 
         if (existingReactionIndex > -1) {
           message.reactions[existingReactionIndex].reaction = reaction;
-          console.log("🔄 Updated existing reaction");
         } else {
           message.reactions.push({
             user: socket.userId,
-            reaction: reaction,
+            reaction,
           });
-          console.log("✅ Added new reaction");
         }
 
         await message.save();
 
-        // Populate the updated message
-        const updatedMessage = await Message.findById(messageId).populate(
-          "reactions.user"
-        );
-        console.log(
-          "💾 Saved message. Updated reactions:",
-          updatedMessage.reactions
-        );
+        const updatedMessage = await Message.findById(messageId)
+          .populate("reactions.user", "username")
+          .populate("sender", "username avatarUrl");
 
-        // Broadcast updated message to all participants in the conversation
+        // Broadcast to all conversation participants
         const convo = await Conversation.findById(
           message.conversation
         ).populate("participants");
-        console.log(
-          "📢 Broadcasting to conversation participants:",
-          convo.participants.map((p) => p._id)
-        );
-
         if (convo) {
           convo.participants.forEach((participant) => {
             const participantSocket = onlineUsers.get(
               participant._id.toString()
             );
-            console.log(
-              `🎯 Participant ${participant._id} - socket: ${participantSocket}`
+            if (participantSocket) {
+              io.to(participantSocket).emit("message:update", {
+                message: updatedMessage,
+              });
+            }
+          });
+        }
+
+        console.log("✅ Reaction updated for message:", messageId);
+      } catch (error) {
+        console.error("❌ Reaction error:", error);
+      }
+    });
+
+    // --- Pin/Unpin Message ---
+    socket.on("message:pin", async ({ messageId, isPinned }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message) {
+          console.log("❌ Message not found for pin:", messageId);
+          return;
+        }
+
+        message.isPinned = isPinned;
+        if (isPinned) {
+          message.pinnedBy = socket.userId;
+          message.pinnedAt = new Date();
+        } else {
+          message.pinnedBy = undefined;
+          message.pinnedAt = undefined;
+        }
+
+        await message.save();
+
+        const updatedMessage = await Message.findById(messageId)
+          .populate("sender", "username avatarUrl")
+          .populate("reactions.user", "username");
+
+        // Broadcast to all conversation participants
+        const convo = await Conversation.findById(
+          message.conversation
+        ).populate("participants");
+        if (convo) {
+          convo.participants.forEach((participant) => {
+            const participantSocket = onlineUsers.get(
+              participant._id.toString()
+            );
+            if (participantSocket) {
+              io.to(participantSocket).emit("message:pin", {
+                message: updatedMessage,
+              });
+            }
+          });
+        }
+
+        console.log("✅ Message pinned status updated:", messageId, isPinned);
+      } catch (error) {
+        console.error("❌ Pin message error:", error);
+      }
+    });
+
+    // --- Delete Message ---
+    socket.on("message:delete", async ({ messageId, deleteForEveryone }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message) {
+          console.log("❌ Message not found for delete:", messageId);
+          return;
+        }
+
+        if (deleteForEveryone) {
+          // Delete for everyone (only sender can do this within 1 hour)
+          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+          if (
+            message.createdAt < oneHourAgo &&
+            message.sender.toString() !== socket.userId
+          ) {
+            console.log("❌ Cannot delete old message for everyone");
+            return;
+          }
+
+          message.isDeleted = true;
+          message.deletedBy = [socket.userId];
+          message.deletedAt = new Date();
+        } else {
+          // Delete for me only
+          if (!message.deletedBy) {
+            message.deletedBy = [socket.userId];
+          } else if (!message.deletedBy.includes(socket.userId)) {
+            message.deletedBy.push(socket.userId);
+          }
+        }
+
+        await message.save();
+
+        const updatedMessage = await Message.findById(messageId)
+          .populate("sender", "username avatarUrl")
+          .populate("reactions.user", "username");
+
+        // Broadcast to all conversation participants
+        const convo = await Conversation.findById(
+          message.conversation
+        ).populate("participants");
+        if (convo) {
+          convo.participants.forEach((participant) => {
+            const participantSocket = onlineUsers.get(
+              participant._id.toString()
             );
             if (participantSocket) {
               io.to(participantSocket).emit("message:update", {
                 message: updatedMessage,
               });
-              console.log("📤 Sent message:update to", participant._id);
             }
           });
-
-          // Also send to the user who reacted
-          const reactorSocket = onlineUsers.get(socket.userId);
-          if (reactorSocket) {
-            io.to(reactorSocket).emit("message:update", {
-              message: updatedMessage,
-            });
-            console.log("📤 Sent message:update to reactor", socket.userId);
-          }
         }
+
+        console.log(
+          "✅ Message deleted:",
+          messageId,
+          deleteForEveryone ? "for everyone" : "for me"
+        );
       } catch (error) {
-        console.error("❌ Reaction error:", error);
+        console.error("❌ Delete message error:", error);
       }
     });
-    // Add typing indicator handler
-    socket.on("user:typing", (data) => {
-      const { to, isTyping } = data;
 
+    // --- Forward Message ---
+    socket.on("message:forward", async ({ messageIds, toUsers }) => {
+      try {
+        if (!messageIds || !toUsers || !Array.isArray(toUsers)) {
+          console.log("❌ Invalid forward data");
+          return;
+        }
+
+        for (const toUserId of toUsers) {
+          let conversation = await Conversation.findOne({
+            participants: { $all: [socket.userId, toUserId] },
+          });
+
+          if (!conversation) {
+            conversation = await Conversation.create({
+              participants: [socket.userId, toUserId],
+            });
+          }
+
+          // Forward each message
+          for (const messageId of messageIds) {
+            const originalMessage = await Message.findById(messageId).populate(
+              "sender",
+              "username avatarUrl"
+            );
+
+            if (!originalMessage || originalMessage.isDeleted) {
+              continue;
+            }
+
+            const forwardedMessage = await Message.create({
+              conversation: conversation._id,
+              sender: socket.userId,
+              text: originalMessage.text,
+              isFile: originalMessage.isFile,
+              file: originalMessage.file,
+              isForwarded: true,
+              forwardedFrom: messageId,
+              seenBy: [socket.userId],
+            });
+
+            // Update conversation
+            conversation.latestMessage = forwardedMessage._id;
+            await conversation.save();
+
+            const populatedMessage = await Message.findById(
+              forwardedMessage._id
+            )
+              .populate("sender", "username avatarUrl")
+              .populate("forwardedFrom", "sender text");
+
+            // Notify recipient
+            const recipientSocket = onlineUsers.get(toUserId);
+            if (recipientSocket) {
+              io.to(recipientSocket).emit("message:new", {
+                message: populatedMessage,
+              });
+            }
+
+            // Notify sender
+            io.to(socket.id).emit("message:new", { message: populatedMessage });
+          }
+        }
+
+        console.log("✅ Messages forwarded successfully");
+      } catch (error) {
+        console.error("❌ Forward message error:", error);
+      }
+    });
+
+    // --- Typing Indicator ---
+    socket.on("user:typing", ({ to, isTyping }) => {
       if (!to) return;
-
-      // Broadcast typing event to the recipient
       const recipientSocket = onlineUsers.get(to.toString());
       if (recipientSocket) {
         io.to(recipientSocket).emit("user:typing", {
           userId: socket.userId,
-          isTyping: isTyping,
+          isTyping,
         });
       }
     });
 
+    // --- Disconnect ---
     socket.on("disconnect", async () => {
       onlineUsers.delete(userId);
       await User.findByIdAndUpdate(userId, {
@@ -173,6 +356,7 @@ export function setupSocket(io) {
         online: false,
         lastSeen: new Date().toISOString(),
       });
+      console.log(`🔴 User ${userId} disconnected`);
     });
   });
 }
