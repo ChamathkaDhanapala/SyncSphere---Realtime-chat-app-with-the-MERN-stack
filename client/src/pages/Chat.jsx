@@ -7,12 +7,172 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useSocket } from "../context/SocketProvider.jsx";
 import { api } from "../lib/api.js";
 
+// Notification Toast Component
+const NotificationToast = ({
+  message,
+  avatar,
+  onClose,
+  onClick,
+  type = "info",
+}) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const getBgColor = () => {
+    switch (type) {
+      case "success":
+        return "#10b981"; // Green for success
+      case "error":
+        return "#ef4444"; // Red for error
+      case "info":
+        return "#3b82f6"; // Blue for info
+      case "sent":
+        return "#6b7280"; // Gray for sent confirmation
+      default:
+        return "#3b82f6";
+    }
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: getBgColor(),
+        color: "white",
+        padding: "12px 16px",
+        borderRadius: "8px",
+        marginBottom: "8px",
+        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        minWidth: "300px",
+        maxWidth: "400px",
+        animation: "slideIn 0.3s ease-out",
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        cursor: onClick ? "pointer" : "default",
+      }}
+      onClick={onClick}
+    >
+      {avatar && (
+        <img
+          src={avatar}
+          alt="User"
+          style={{
+            width: "32px",
+            height: "32px",
+            borderRadius: "50%",
+            objectFit: "cover",
+          }}
+          onError={(e) => {
+            e.target.style.display = "none";
+          }}
+        />
+      )}
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: "14px", fontWeight: "500" }}>
+          {type === "sent" ? "Message Sent" : "New Message"}
+        </div>
+        <div
+          style={{
+            fontSize: "13px",
+            color: "rgba(255, 255, 255, 0.9)",
+            marginTop: "2px",
+          }}
+        >
+          {message}
+        </div>
+      </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onClose();
+        }}
+        style={{
+          background: "none",
+          border: "none",
+          color: "rgba(255, 255, 255, 0.7)",
+          cursor: "pointer",
+          fontSize: "16px",
+          padding: "4px",
+          borderRadius: "4px",
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+};
+
 export default function Chat() {
   const { user } = useAuth();
-  const { socket, isOnline } = useSocket();
+  const { socket } = useSocket();
   const [peer, setPeer] = useState(null);
   const [messages, setMessages] = useState([]);
   const [typingUsers, setTypingUsers] = useState({});
+  const [notifications, setNotifications] = useState([]);
+
+  // Browser notification function
+  const showBrowserNotification = (title, body, icon) => {
+    if (!("Notification" in window)) {
+      console.log("❌ Browser does not support notifications");
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      new Notification(title, {
+        body: body,
+        icon: icon || "/favicon.ico",
+        tag: "message",
+      });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification(title, {
+            body: body,
+            icon: icon || "/favicon.ico",
+            tag: "message",
+          });
+        }
+      });
+    }
+  };
+
+  // Custom notification function
+  const showNotification = (message, type = "info", avatar = null) => {
+    const notificationId = Date.now().toString();
+    setNotifications((prev) => [
+      ...prev,
+      {
+        id: notificationId,
+        message,
+        avatar,
+        type,
+      },
+    ]);
+  };
+
+  // Request notification permission when user interacts
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      const handleInteraction = () => {
+        Notification.requestPermission().then((permission) => {
+          console.log("🔔 Notification permission:", permission);
+        });
+        document.removeEventListener("click", handleInteraction);
+      };
+
+      document.addEventListener("click", handleInteraction);
+
+      return () => {
+        document.removeEventListener("click", handleInteraction);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (!peer) return;
@@ -30,28 +190,157 @@ export default function Chat() {
     loadMessages();
   }, [peer]);
 
-  // Socket message listener
-  useEffect(() => {
+  // Delete message function
+  const handleDeleteMessage = async (messageId, deleteForEveryone = false) => {
     if (!socket) return;
 
+    try {
+      const { data } = await api.post("/messages/delete", {
+        messageId,
+        deleteForEveryone,
+      });
+
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === messageId ? data : msg))
+      );
+
+      showNotification(
+        deleteForEveryone
+          ? "Message deleted for everyone"
+          : "Message deleted for you",
+        "success"
+      );
+    } catch (error) {
+      console.error("Delete message failed:", error);
+      showNotification("Failed to delete message", "error");
+      socket.emit("message:delete", { messageId, deleteForEveryone });
+    }
+  };
+
+  // Forward message function
+  const handleForwardMessage = async (messageIds, toUsers) => {
+    if (!socket) return;
+
+    try {
+      const { data } = await api.post("/messages/forward", {
+        messageIds,
+        toUsers,
+      });
+
+      showNotification(
+        `Message forwarded to ${toUsers.length} contact(s)`,
+        "success"
+      );
+      return data;
+    } catch (error) {
+      console.error("Forward message failed:", error);
+      showNotification("Failed to forward message", "error");
+      throw error;
+    }
+  };
+
+  // Socket message listener
+  useEffect(() => {
+    if (!socket) {
+      console.log("❌ No socket available - check SocketProvider");
+      return;
+    }
+
+    console.log("🟢 Setting up socket listeners");
+
     const handleNewMessage = ({ message }) => {
+      console.log("🟢 FRONTEND: New message received:", message._id);
+
       if (!peer || message.sender === peer._id || message.sender === user._id) {
         setMessages((prev) => [...prev, message]);
       }
     };
 
     const handleMessageUpdate = ({ message }) => {
+      console.log("🟢 FRONTEND: Message update received:", message._id);
       setMessages((prev) =>
         prev.map((msg) => (msg._id === message._id ? message : msg))
       );
     };
 
+    const handleMessagePinUpdate = ({ message }) => {
+      console.log(
+        "🟢 FRONTEND: Message pin update received:",
+        message._id,
+        message.isPinned
+      );
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === message._id ? { ...msg, isPinned: message.isPinned } : msg
+        )
+      );
+    };
+
+    const handleMessageDelete = ({ message }) => {
+      console.log("🟢 FRONTEND: Message delete update received:", message._id);
+      setMessages((prev) =>
+        prev.map((msg) => (msg._id === message._id ? message : msg))
+      );
+    };
+
+    // Handle message notifications (for receivers)
+    const handleMessageNotification = ({ message, type }) => {
+      console.log("🟢 FRONTEND: Notification event received");
+
+      if (type === "new_message") {
+        const isFromMe = message.sender._id === user._id;
+        const senderName = isFromMe ? "You" : message.sender.username;
+
+        const messageText =
+          message.text.length > 50
+            ? message.text.substring(0, 50) + "..."
+            : message.text;
+
+        const avatarUrl = message.sender.avatarUrl
+          ? `http://localhost:5000${message.sender.avatarUrl}`
+          : null;
+
+        console.log("📢 FRONTEND: Creating notification");
+
+        const notificationId = Date.now().toString();
+        setNotifications((prev) => [
+          ...prev,
+          {
+            id: notificationId,
+            message: `${senderName}: ${messageText}`,
+            avatar: avatarUrl,
+            type: isFromMe ? "sent" : "info",
+          },
+        ]);
+
+        console.log("✅ FRONTEND: Notification added");
+
+        // Show browser notification if tab is not active and message is from others
+        if (document.hidden && !isFromMe) {
+          console.log(
+            "📢 FRONTEND: Tab is hidden, showing browser notification"
+          );
+          showBrowserNotification(
+            `New message from ${senderName}`,
+            messageText,
+            avatarUrl
+          );
+        }
+      }
+    };
+
     socket.on("message:new", handleNewMessage);
     socket.on("message:update", handleMessageUpdate);
+    socket.on("message:pin", handleMessagePinUpdate);
+    socket.on("message:delete", handleMessageDelete);
+    socket.on("message:notification", handleMessageNotification);
 
     return () => {
       socket.off("message:new", handleNewMessage);
       socket.off("message:update", handleMessageUpdate);
+      socket.off("message:pin", handleMessagePinUpdate);
+      socket.off("message:delete", handleMessageDelete);
+      socket.off("message:notification", handleMessageNotification);
     };
   }, [socket, peer, user]);
 
@@ -60,12 +349,6 @@ export default function Chat() {
     if (!socket) return;
 
     const handleUserTyping = ({ userId, isTyping }) => {
-      console.log("Typing event received:", {
-        userId,
-        isTyping,
-        currentPeer: peer?._id,
-      });
-
       if (peer && userId === peer._id) {
         setTypingUsers((prev) => ({
           ...prev,
@@ -87,7 +370,6 @@ export default function Chat() {
     return () => socket.off("user:typing", handleUserTyping);
   }, [socket, peer]);
 
-  // Clean up typing indicator when peer changes
   useEffect(() => {
     setTypingUsers({});
   }, [peer]);
@@ -99,50 +381,84 @@ export default function Chat() {
   const handleReaction = async (messageId, reaction) => {
     if (!socket) return;
 
-    console.log("Sending reaction:", { messageId, reaction });
-
-    // Optimistic local update
     setMessages((prev) =>
       prev.map((msg) =>
         msg._id === messageId
           ? {
               ...msg,
               reactions: [
-                // remove old reaction from same user if exists
                 ...(msg.reactions?.filter(
                   (r) => r.user !== user._id && r.user?._id !== user._id
                 ) || []),
-                { user: user._id, reaction }, // add new reaction
+                { user: user._id, reaction },
               ],
             }
           : msg
       )
     );
 
-    // Emit to backend so others see it
     socket.emit("message:react", {
       messageId,
       reaction,
     });
   };
 
-  const handleFileSend = async (file) => {
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("to", peer._id);
+  // Add pin/unpin functions
+  const handlePinMessage = async (messageId) => {
+    if (!socket) return;
 
-      const res = await api.post("/messages/file", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+    try {
+      const { data } = await api.post("/messages/pin", {
+        messageId,
+        isPinned: true,
       });
 
-      // Add to local messages
-      setMessages((prev) => [...prev, res.data]);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, isPinned: true } : msg
+        )
+      );
 
-      // Notify peer
-      socket.emit("message:send", res.data);
-    } catch (err) {
-      console.error("❌ File upload failed:", err);
+      // Show notification
+      showNotification("Message pinned", "success");
+    } catch (error) {
+      console.error("Pin message failed:", error);
+      socket.emit("message:pin", { messageId, isPinned: true });
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, isPinned: true } : msg
+        )
+      );
+    }
+  };
+
+  const handleUnpinMessage = async (messageId) => {
+    if (!socket) return;
+
+    try {
+      const { data } = await api.post("/messages/pin", {
+        messageId,
+        isPinned: false,
+      });
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, isPinned: false } : msg
+        )
+      );
+
+      // Show notification
+      showNotification("Message unpinned", "info");
+    } catch (error) {
+      console.error("Unpin message failed:", error);
+      socket.emit("message:pin", { messageId, isPinned: false });
+
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg._id === messageId ? { ...msg, isPinned: false } : msg
+        )
+      );
     }
   };
 
@@ -156,9 +472,21 @@ export default function Chat() {
       createdAt: new Date().toISOString(),
       isTemp: true,
       reactions: [],
+      isPinned: false,
     };
 
     setMessages((prev) => [...prev, tempMessage]);
+
+    // Show "sending" notification
+    const sendingNotificationId = Date.now().toString();
+    setNotifications((prev) => [
+      ...prev,
+      {
+        id: sendingNotificationId,
+        message: `Sending to ${peer.username}...`,
+        type: "info",
+      },
+    ]);
 
     try {
       const { data } = await api.post("/messages/send", {
@@ -169,8 +497,22 @@ export default function Chat() {
       setMessages((prev) =>
         prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
       );
+
+      setNotifications((prev) =>
+        prev.filter((n) => n.id !== sendingNotificationId)
+      );
+
+      // Show sent confirmation
+      const messagePreview =
+        text.length > 30 ? text.substring(0, 30) + "..." : text;
+      showNotification(`To ${peer.username}: ${messagePreview}`, "sent");
     } catch (error) {
       console.error("API failed, using socket");
+
+      setNotifications((prev) =>
+        prev.filter((n) => n.id !== sendingNotificationId)
+      );
+      showNotification(`Failed to send to ${peer.username}`, "error");
 
       if (socket) {
         socket.emit("message:send", { to: peer._id, text });
@@ -187,8 +529,6 @@ export default function Chat() {
   const sendFile = async (file) => {
     if (!peer || !file) return;
 
-    console.log("📤 Sending file:", file.name, file.type, file.size);
-
     const tempMessage = {
       _id: Date.now().toString(),
       file: {
@@ -203,16 +543,17 @@ export default function Chat() {
       isFile: true,
       text: `Uploading: ${file.name}`,
       reactions: [],
+      isPinned: false,
     };
 
     setMessages((prev) => [...prev, tempMessage]);
+
+    showNotification(`Uploading ${file.name} to ${peer.username}...`, "info");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("to", peer._id);
-
-      console.log("📨 Uploading file to server...");
 
       const { data } = await api.post("/messages/send-file", formData, {
         headers: {
@@ -221,13 +562,17 @@ export default function Chat() {
         timeout: 30000,
       });
 
-      console.log("✅ File upload successful:", data);
-
       setMessages((prev) =>
         prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
       );
+
+      // Show success notification
+      showNotification(`File sent to ${peer.username}: ${file.name}`, "sent");
     } catch (error) {
-      console.error("❌ File upload failed:", error);
+      console.error("File upload failed:", error);
+
+      // Show error notification
+      showNotification(`Failed to send file to ${peer.username}`, "error");
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -244,10 +589,6 @@ export default function Chat() {
             : msg
         )
       );
-
-      if (socket) {
-        console.log("🔄 Trying socket fallback for file sharing...");
-      }
     }
   };
 
@@ -267,8 +608,67 @@ export default function Chat() {
         height: "100vh",
         display: "flex",
         backgroundColor: "#0f172a",
+        position: "relative",
       }}
     >
+      {/* CSS Animation */}
+      <style>
+        {`
+          @keyframes typing {
+            0%, 60%, 100% {
+              transform: translateY(0);
+              opacity: 0.4;
+            }
+            30% {
+              transform: translateY(-5px);
+              opacity: 1;
+            }
+          }
+          @keyframes slideIn {
+            from {
+              transform: translateX(100%);
+              opacity: 0;
+            }
+            to {
+              transform: translateX(0);
+              opacity: 1;
+            }
+          }
+        `}
+      </style>
+
+      {/* Notification Container */}
+      <div
+        style={{
+          position: "fixed",
+          top: "20px",
+          right: "20px",
+          zIndex: 10000,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+        }}
+      >
+        {notifications.map((notification) => (
+          <NotificationToast
+            key={notification.id}
+            message={notification.message}
+            avatar={notification.avatar}
+            type={notification.type}
+            onClose={() =>
+              setNotifications((prev) =>
+                prev.filter((n) => n.id !== notification.id)
+              )
+            }
+            onClick={() =>
+              setNotifications((prev) =>
+                prev.filter((n) => n.id !== notification.id)
+              )
+            }
+          />
+        ))}
+      </div>
+
       {/* Sidebar */}
       <div
         style={{
@@ -290,13 +690,18 @@ export default function Chat() {
       >
         {peer ? (
           <>
-            {/* Chat Window (includes header) */}
+            {/* Chat Window */}
             <div style={{ flex: 1, overflow: "hidden" }}>
               <ChatWindow
                 me={user}
                 peer={peer}
                 messages={enhancedMessages}
+                setMessages={setMessages}
                 onReaction={handleReaction}
+                onPinMessage={handlePinMessage}
+                onUnpinMessage={handleUnpinMessage}
+                onDeleteMessage={handleDeleteMessage}
+                onForwardMessage={handleForwardMessage}
                 MessageReactions={MessageReactions}
               />
             </div>
