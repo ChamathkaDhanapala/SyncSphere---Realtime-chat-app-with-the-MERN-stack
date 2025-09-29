@@ -45,12 +45,35 @@ export default function AdminDashboard() {
     if (user?.isAdmin) fetchUsers();
   }, [user]);
 
+  // Debug effect to track state changes
+  useEffect(() => {
+    console.log("📊 Users state updated:", {
+      total: users.length,
+      active: users.filter(u => u.isActive).length,
+      admins: users.filter(u => u.isAdmin).length,
+    });
+  }, [users]);
+
   const fetchUsers = async () => {
     try {
       setLoading(true);
       setError("");
       console.log("🔄 Fetching users...");
 
+      // Try admin endpoint first
+      try {
+        const adminResponse = await api.get("/admin/users");
+        console.log("✅ Admin users endpoint successful:", adminResponse.data);
+        
+        if (adminResponse.data && adminResponse.data.users) {
+          setUsers(adminResponse.data.users);
+          return;
+        }
+      } catch (adminErr) {
+        console.log("❌ Admin users endpoint failed, falling back to regular endpoint...");
+      }
+
+      // Fallback to regular users endpoint
       const response = await api.get("/users");
       console.log("✅ Users fetched successfully:", response.data);
 
@@ -84,63 +107,83 @@ export default function AdminDashboard() {
 
   const toggleUserStatus = async (userId, currentStatus) => {
     try {
-      console.log(`🔄 Toggling status for user ${userId}`);
-
-      await api.put(`/users/${userId}`, {
+      console.log(`🔄 Toggling status for user ${userId} from ${currentStatus} to ${!currentStatus}`);
+      
+      const response = await api.put(`/admin/users/${userId}/status`, {
         isActive: !currentStatus,
       });
+      console.log("✅ Status update response:", response.data);
 
-      setSuccess(
-        `User ${!currentStatus ? "activated" : "deactivated"} successfully`
+      setSuccess(`User ${!currentStatus ? "activated" : "deactivated"} successfully`);
+      
+      // Update the local state immediately
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === userId 
+            ? { ...user, isActive: !currentStatus }
+            : user
+        )
       );
-      fetchUsers();
+      
     } catch (err) {
       console.error("❌ Status update error:", err);
-      const errorMessage =
-        err.response?.data?.message || "Failed to update user status";
+      console.error("Error details:", err.response?.data);
+      
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || "Failed to update user status";
       setError(errorMessage);
     }
   };
 
   const toggleAdminStatus = async (userId, currentStatus) => {
     try {
-      console.log(`🔄 Toggling admin status for user ${userId}`);
-
-      await api.put(`/users/${userId}`, {
+      console.log(`🔄 Toggling admin status for user ${userId} from ${currentStatus} to ${!currentStatus}`);
+      
+      const response = await api.put(`/admin/users/${userId}/role`, {
         isAdmin: !currentStatus,
       });
+      console.log("✅ Admin update response:", response.data);
 
-      setSuccess(
-        `Admin privileges ${
-          !currentStatus ? "granted" : "revoked"
-        } successfully`
+      setSuccess(`Admin privileges ${!currentStatus ? "granted" : "revoked"} successfully`);
+      
+      // Update the local state immediately
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user._id === userId 
+            ? { ...user, isAdmin: !currentStatus }
+            : user
+        )
       );
-      fetchUsers();
+      
     } catch (err) {
       console.error("❌ Admin update error:", err);
-      const errorMessage =
-        err.response?.data?.message || "Failed to update admin status";
+      console.error("Error details:", err.response?.data);
+      
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || "Failed to update admin status";
       setError(errorMessage);
     }
   };
 
   const deleteUser = async (userId) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this user? This action cannot be undone."
-      )
-    )
+    if (!window.confirm("Are you sure you want to delete this user? This action cannot be undone.")) {
       return;
+    }
 
     try {
       console.log(`🔄 Deleting user ${userId}`);
-      await api.delete(`/users/${userId}`);
+      
+      const response = await api.delete(`/admin/users/${userId}`);
+      console.log("✅ Delete response:", response.data);
+
       setSuccess("User deleted successfully");
-      fetchUsers();
+      
+      // Update the local state immediately
+      setUsers(prevUsers => prevUsers.filter(user => user._id !== userId));
+      
     } catch (err) {
       console.error("❌ Delete error:", err);
-      const errorMessage =
-        err.response?.data?.message || "Failed to delete user";
+      console.error("Error details:", err.response?.data);
+      
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || "Failed to delete user";
       setError(errorMessage);
     }
   };
@@ -157,6 +200,13 @@ export default function AdminDashboard() {
       return () => clearTimeout(timer);
     }
   }, [success]);
+
+  useEffect(() => {
+    if (error) {
+      const timer = setTimeout(() => setError(""), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [error]);
 
   if (!user?.isAdmin) {
     return (
@@ -206,9 +256,14 @@ export default function AdminDashboard() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
+          flexDirection: "column",
+          gap: 2,
         }}
       >
         <CircularProgress sx={{ color: "#3b82f6" }} size={60} />
+        <Typography variant="body1" sx={{ color: "white" }}>
+          Loading admin dashboard...
+        </Typography>
       </Box>
     );
   }
@@ -218,21 +273,21 @@ export default function AdminDashboard() {
       sx={{
         minHeight: "100vh",
         background: "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-        py: 4,
+        py: 3,
       }}
     >
       <Container maxWidth="xl">
         {/* Header */}
         <Paper
           sx={{
-            p: 4,
-            mb: 3,
+            p: 3,
+            mb: 2,
             background: "rgba(30, 41, 59, 0.9)",
             backdropFilter: "blur(20px)",
-            borderRadius: "16px",
+            borderRadius: "12px",
             border: "1px solid rgba(255, 255, 255, 0.1)",
             color: "white",
-            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
           }}
         >
           <Box
@@ -240,27 +295,27 @@ export default function AdminDashboard() {
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              mb: 3,
+              mb: 2,
             }}
           >
             <Box>
               <Typography
-                variant="h3"
+                variant="h4"
                 gutterBottom
                 sx={{
                   color: "white",
-                  background:
-                    "linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)",
+                  background: "linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%)",
                   backgroundClip: "text",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
                   fontWeight: 700,
+                  mb: 1,
                 }}
               >
                 Admin Dashboard
               </Typography>
               <Typography
-                variant="body1"
+                variant="body2"
                 sx={{ color: "rgba(255, 255, 255, 0.7)" }}
               >
                 Manage users and system settings
@@ -270,12 +325,10 @@ export default function AdminDashboard() {
               <IconButton
                 onClick={fetchUsers}
                 sx={{
-                  background:
-                    "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
+                  background: "linear-gradient(135deg, #3b82f6 0%, #6366f1 100%)",
                   color: "white",
                   "&:hover": {
-                    background:
-                      "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)",
+                    background: "linear-gradient(135deg, #2563eb 0%, #4f46e5 100%)",
                     transform: "rotate(180deg)",
                     transition: "all 0.3s ease",
                   },
@@ -291,7 +344,7 @@ export default function AdminDashboard() {
             sx={{
               display: "flex",
               alignItems: "center",
-              gap: 3,
+              gap: 2,
               flexWrap: "wrap",
             }}
           >
@@ -304,16 +357,18 @@ export default function AdminDashboard() {
                   transform: "translateY(-50%)",
                   color: "#9ca3af",
                   zIndex: 1,
+                  fontSize: 20,
                 }}
               />
               <TextField
                 fullWidth
+                size="small"
                 placeholder="Search users by name or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 sx={{
                   "& .MuiOutlinedInput-root": {
-                    borderRadius: "12px",
+                    borderRadius: "8px",
                     backgroundColor: "rgba(255, 255, 255, 0.05)",
                     color: "white",
                     pl: 4,
@@ -329,8 +384,10 @@ export default function AdminDashboard() {
                   },
                   "& .MuiInputBase-input": {
                     color: "white",
+                    fontSize: "0.875rem",
                     "&::placeholder": {
                       color: "rgba(255, 255, 255, 0.5)",
+                      fontSize: "0.875rem",
                     },
                   },
                 }}
@@ -338,25 +395,25 @@ export default function AdminDashboard() {
             </Box>
 
             {/* Stats */}
-            <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
+            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
               <Paper
                 sx={{
-                  p: 2,
-                  minWidth: 120,
+                  p: 1.5,
+                  minWidth: 100,
                   background: "rgba(34, 197, 94, 0.1)",
                   border: "1px solid rgba(34, 197, 94, 0.2)",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   textAlign: "center",
                 }}
               >
                 <Typography
-                  variant="h6"
+                  variant="subtitle1"
                   sx={{ color: "#22c55e", fontWeight: 700 }}
                 >
                   {users.filter((u) => u.isActive).length}
                 </Typography>
                 <Typography
-                  variant="body2"
+                  variant="caption"
                   sx={{ color: "rgba(255, 255, 255, 0.7)" }}
                 >
                   Active
@@ -364,22 +421,22 @@ export default function AdminDashboard() {
               </Paper>
               <Paper
                 sx={{
-                  p: 2,
-                  minWidth: 120,
+                  p: 1.5,
+                  minWidth: 100,
                   background: "rgba(59, 130, 246, 0.1)",
                   border: "1px solid rgba(59, 130, 246, 0.2)",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   textAlign: "center",
                 }}
               >
                 <Typography
-                  variant="h6"
+                  variant="subtitle1"
                   sx={{ color: "#3b82f6", fontWeight: 700 }}
                 >
                   {users.filter((u) => u.isAdmin).length}
                 </Typography>
                 <Typography
-                  variant="body2"
+                  variant="caption"
                   sx={{ color: "rgba(255, 255, 255, 0.7)" }}
                 >
                   Admins
@@ -387,22 +444,22 @@ export default function AdminDashboard() {
               </Paper>
               <Paper
                 sx={{
-                  p: 2,
-                  minWidth: 120,
+                  p: 1.5,
+                  minWidth: 100,
                   background: "rgba(255, 255, 255, 0.05)",
                   border: "1px solid rgba(255, 255, 255, 0.1)",
-                  borderRadius: "12px",
+                  borderRadius: "8px",
                   textAlign: "center",
                 }}
               >
                 <Typography
-                  variant="h6"
+                  variant="subtitle1"
                   sx={{ color: "white", fontWeight: 700 }}
                 >
                   {users.length}
                 </Typography>
                 <Typography
-                  variant="body2"
+                  variant="caption"
                   sx={{ color: "rgba(255, 255, 255, 0.7)" }}
                 >
                   Total
@@ -419,7 +476,7 @@ export default function AdminDashboard() {
             onClose={() => setError("")}
             sx={{
               mb: 2,
-              borderRadius: "12px",
+              borderRadius: "8px",
               background: "rgba(239, 68, 68, 0.1)",
               border: "1px solid rgba(239, 68, 68, 0.3)",
               color: "#fca5a5",
@@ -435,7 +492,7 @@ export default function AdminDashboard() {
             onClose={() => setSuccess("")}
             sx={{
               mb: 2,
-              borderRadius: "12px",
+              borderRadius: "8px",
               background: "rgba(34, 197, 94, 0.1)",
               border: "1px solid rgba(34, 197, 94, 0.3)",
               color: "#86efac",
@@ -452,9 +509,9 @@ export default function AdminDashboard() {
             overflow: "hidden",
             background: "rgba(30, 41, 59, 0.9)",
             backdropFilter: "blur(20px)",
-            borderRadius: "16px",
+            borderRadius: "12px",
             border: "1px solid rgba(255, 255, 255, 0.1)",
-            boxShadow: "0 20px 40px rgba(0, 0, 0, 0.4)",
+            boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
           }}
         >
           <TableContainer sx={{ maxHeight: 600 }}>
@@ -467,6 +524,7 @@ export default function AdminDashboard() {
                       color: "white",
                       fontWeight: 600,
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                      py: 1.5,
                     }}
                   >
                     User
@@ -477,6 +535,7 @@ export default function AdminDashboard() {
                       color: "white",
                       fontWeight: 600,
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                      py: 1.5,
                     }}
                   >
                     Email
@@ -487,6 +546,7 @@ export default function AdminDashboard() {
                       color: "white",
                       fontWeight: 600,
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                      py: 1.5,
                     }}
                   >
                     Status
@@ -497,6 +557,7 @@ export default function AdminDashboard() {
                       color: "white",
                       fontWeight: 600,
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                      py: 1.5,
                     }}
                   >
                     Role
@@ -507,6 +568,7 @@ export default function AdminDashboard() {
                       color: "white",
                       fontWeight: 600,
                       borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
+                      py: 1.5,
                     }}
                   >
                     Actions
@@ -524,14 +586,14 @@ export default function AdminDashboard() {
                       },
                     }}
                   >
-                    <TableCell sx={{ color: "white" }}>
+                    <TableCell sx={{ color: "white", py: 1.5 }}>
                       <Box
                         sx={{ display: "flex", alignItems: "center", gap: 2 }}
                       >
                         <Box
                           sx={{
-                            width: 40,
-                            height: 40,
+                            width: 36,
+                            height: 36,
                             borderRadius: "50%",
                             backgroundColor: u.isActive ? "#3b82f6" : "#6b7280",
                             display: "flex",
@@ -539,14 +601,14 @@ export default function AdminDashboard() {
                             justifyContent: "center",
                             color: "white",
                             fontWeight: "bold",
-                            fontSize: "14px",
+                            fontSize: "13px",
                           }}
                         >
                           {u.username?.charAt(0)?.toUpperCase()}
                         </Box>
                         <Box>
                           <Typography
-                            variant="body1"
+                            variant="body2"
                             sx={{ color: "white", fontWeight: 500 }}
                           >
                             {u.username}
@@ -560,15 +622,16 @@ export default function AdminDashboard() {
                         </Box>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ color: "rgba(255, 255, 255, 0.8)" }}>
+                    <TableCell sx={{ color: "rgba(255, 255, 255, 0.8)", py: 1.5 }}>
                       {u.email}
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
                       <Chip
                         icon={u.isActive ? <CheckCircle /> : <Block />}
                         label={u.isActive ? "Active" : "Inactive"}
                         color={u.isActive ? "success" : "error"}
                         variant="outlined"
+                        size="small"
                         sx={{
                           borderColor: u.isActive ? "#22c55e" : "#ef4444",
                           color: u.isActive ? "#22c55e" : "#ef4444",
@@ -578,12 +641,13 @@ export default function AdminDashboard() {
                         }}
                       />
                     </TableCell>
-                    <TableCell>
+                    <TableCell sx={{ py: 1.5 }}>
                       <Chip
                         icon={u.isAdmin ? <AdminPanelSettings /> : <Person />}
                         label={u.isAdmin ? "Admin" : "User"}
                         color={u.isAdmin ? "primary" : "default"}
                         variant="outlined"
+                        size="small"
                         sx={{
                           borderColor: u.isAdmin ? "#3b82f6" : "#6b7280",
                           color: u.isAdmin
@@ -595,8 +659,8 @@ export default function AdminDashboard() {
                         }}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                    <TableCell sx={{ py: 1.5 }}>
+                      <Box sx={{ display: "flex", gap: 0.5, flexWrap: "wrap" }}>
                         <Tooltip
                           title={
                             u.isActive ? "Deactivate User" : "Activate User"
@@ -608,6 +672,7 @@ export default function AdminDashboard() {
                               u.isActive ? <VisibilityOff /> : <Visibility />
                             }
                             onClick={() => toggleUserStatus(u._id, u.isActive)}
+                            disabled={u._id === user._id}
                             sx={{
                               background: u.isActive
                                 ? "rgba(245, 158, 11, 0.1)"
@@ -616,10 +681,17 @@ export default function AdminDashboard() {
                               border: `1px solid ${
                                 u.isActive ? "#f59e0b" : "#22c55e"
                               }`,
+                              fontSize: '0.75rem',
+                              minWidth: 'auto',
+                              px: 1,
                               "&:hover": {
                                 background: u.isActive
                                   ? "rgba(245, 158, 11, 0.2)"
                                   : "rgba(34, 197, 94, 0.2)",
+                              },
+                              "&:disabled": {
+                                opacity: 0.5,
+                                cursor: "not-allowed",
                               },
                             }}
                           >
@@ -633,6 +705,7 @@ export default function AdminDashboard() {
                             size="small"
                             startIcon={<AdminPanelSettings />}
                             onClick={() => toggleAdminStatus(u._id, u.isAdmin)}
+                            disabled={u._id === user._id}
                             sx={{
                               background: u.isAdmin
                                 ? "rgba(99, 102, 241, 0.1)"
@@ -641,14 +714,21 @@ export default function AdminDashboard() {
                               border: `1px solid ${
                                 u.isAdmin ? "#6366f1" : "#3b82f6"
                               }`,
+                              fontSize: '0.75rem',
+                              minWidth: 'auto',
+                              px: 1,
                               "&:hover": {
                                 background: u.isAdmin
                                   ? "rgba(99, 102, 241, 0.2)"
                                   : "rgba(59, 130, 246, 0.2)",
                               },
+                              "&:disabled": {
+                                opacity: 0.5,
+                                cursor: "not-allowed",
+                              },
                             }}
                           >
-                            {u.isAdmin ? "Remove Admin" : "Make Admin"}
+                            {u.isAdmin ? "Remove" : "Make Admin"}
                           </Button>
                         </Tooltip>
                         <Tooltip title="Delete User">
@@ -656,12 +736,20 @@ export default function AdminDashboard() {
                             size="small"
                             startIcon={<Delete />}
                             onClick={() => deleteUser(u._id)}
+                            disabled={u._id === user._id}
                             sx={{
                               background: "rgba(239, 68, 68, 0.1)",
                               color: "#ef4444",
                               border: "1px solid #ef4444",
+                              fontSize: '0.75rem',
+                              minWidth: 'auto',
+                              px: 1,
                               "&:hover": {
                                 background: "rgba(239, 68, 68, 0.2)",
+                              },
+                              "&:disabled": {
+                                opacity: 0.5,
+                                cursor: "not-allowed",
                               },
                             }}
                           >
@@ -680,11 +768,11 @@ export default function AdminDashboard() {
             <Box
               sx={{
                 textAlign: "center",
-                py: 8,
+                py: 6,
                 color: "rgba(255, 255, 255, 0.5)",
               }}
             >
-              <Search sx={{ fontSize: 48, mb: 2, opacity: 0.5 }} />
+              <Search sx={{ fontSize: 40, mb: 2, opacity: 0.5 }} />
               <Typography variant="h6" gutterBottom>
                 No users found
               </Typography>
