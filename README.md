@@ -110,7 +110,8 @@ cd ../server
 npm install
 ```
 
-
+## 🎥 Demo
+https://github.com/user-attachments/assets/82e60ea2-15bc-4f7a-917b-9c92c4b0d27a
 
 
 
