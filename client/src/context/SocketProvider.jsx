@@ -10,59 +10,93 @@ import { io } from "socket.io-client";
 import { useAuth } from "./AuthContext.jsx";
 
 const SocketCtx = createContext(null);
+
 export function useSocket() {
-  return useContext(SocketCtx);
+  const context = useContext(SocketCtx);
+  if (!context) {
+    throw new Error("useSocket must be used within a SocketProvider");
+  }
+  return context;
 }
 
 export function SocketProvider({ children }) {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
   const [socket, setSocket] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
   const [onlineMap, setOnlineMap] = useState(new Map());
-  const [isOnline, setIsOnline] = useState(false);
   const onlineRef = useRef(new Map());
+  const socketRef = useRef(null);
 
   useEffect(() => {
-    if (!token) {
+    if (!token || !user) {
+      console.log("❌ No token or user, disconnecting socket");
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
       setSocket(null);
-      setIsOnline(false);
+      setIsConnected(false);
       return;
     }
 
-    const s = io(process.env.REACT_APP_API_URL || "http://localhost:5000", {
-      auth: { token },
-    });
+    if (!socketRef.current || socketRef.current.disconnected) {
+      console.log("🔄 Creating new socket connection for user:", user._id);
 
-    setSocket(s);
+      const newSocket = io(
+        process.env.REACT_APP_API_URL || "http://localhost:5000",
+        {
+          auth: { token },
+          transports: ["websocket", "polling"],
+        }
+      );
 
-    s.on("connect", () => {
-      console.log("✅ Socket connected");
-      setIsOnline(true);
-    });
+      socketRef.current = newSocket;
+      setSocket(newSocket);
 
-    s.on("disconnect", () => {
-      console.log("❌ Socket disconnected");
-      setIsOnline(false);
-    });
+      newSocket.on("connect", () => {
+        console.log("✅ Socket connected, ID:", newSocket.id);
+        setIsConnected(true);
+      });
 
-    s.on("presence:update", ({ userId, online, lastSeen }) => {
-      console.log("👥 Presence update:", userId, online);
-      const m = new Map(onlineRef.current);
-      if (online) m.set(userId, true);
-      else m.delete(userId);
+      newSocket.on("disconnect", (reason) => {
+        console.log("❌ Socket disconnected:", reason);
+        setIsConnected(false);
+      });
 
-      onlineRef.current = m;
-      setOnlineMap(m);
-    });
+      newSocket.on("connect_error", (error) => {
+        console.error("❌ Socket connection error:", error.message);
+        setIsConnected(false);
+      });
 
-    return () => {
-      s.disconnect();
-    };
-  }, [token]);
+      newSocket.on("presence:update", ({ userId, online, lastSeen }) => {
+        console.log("👥 Presence update:", userId, online);
+        const m = new Map(onlineRef.current);
+        if (online) {
+          m.set(userId, true);
+        } else {
+          m.delete(userId);
+        }
+        onlineRef.current = m;
+        setOnlineMap(m);
+      });
+
+      newSocket.connect();
+    }
+
+    return () => {};
+  }, [token, user]);
 
   const value = useMemo(() => {
-    const isUserOnline = (userId) => onlineMap.has(userId);
-    return { socket, isOnline, isOnline: isUserOnline };
-  }, [socket, onlineMap, isOnline]);
+    const isUserOnline = (userId) => {
+      return onlineMap.has(userId);
+    };
+
+    return {
+      socket,
+      isOnline: isConnected,
+      isOnline: isUserOnline,
+    };
+  }, [socket, isConnected, onlineMap]);
 
   return <SocketCtx.Provider value={value}>{children}</SocketCtx.Provider>;
 }
