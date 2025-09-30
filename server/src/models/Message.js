@@ -29,17 +29,46 @@ const messageSchema = new mongoose.Schema(
     },
     text: {
       type: String,
-      required: true,
+
+      required: function () {
+        return !this.isFile;
+      },
     },
     isFile: {
       type: Boolean,
       default: false,
     },
     file: {
-      name: String,
-      url: String,
-      type: String,
-      size: Number,
+      filename: {
+        type: String,
+        required: function () {
+          return this.isFile;
+        },
+      },
+      originalName: {
+        type: String,
+        required: function () {
+          return this.isFile;
+        },
+      },
+      mimetype: {
+        type: String,
+        required: function () {
+          return this.isFile;
+        },
+      },
+      size: {
+        type: Number,
+        required: function () {
+          return this.isFile;
+        },
+      },
+      url: {
+        type: String,
+        required: function () {
+          return this.isFile;
+        },
+      },
     },
     isDeleted: {
       type: Boolean,
@@ -73,7 +102,6 @@ const messageSchema = new mongoose.Schema(
     pinnedAt: {
       type: Date,
     },
-
     reactions: [reactionSchema],
     seenBy: [
       {
@@ -82,7 +110,21 @@ const messageSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
+  }
 );
+
+messageSchema.index({ conversation: 1, createdAt: 1 });
+messageSchema.index({ sender: 1 });
+messageSchema.index({ isFile: 1 });
+messageSchema.index({ isPinned: 1 });
+
+messageSchema.virtual("isVisible").get(function () {
+  return !this.isDeleted || !this.deletedBy.includes(this.sender);
+});
 
 export default mongoose.model("Message", messageSchema);
