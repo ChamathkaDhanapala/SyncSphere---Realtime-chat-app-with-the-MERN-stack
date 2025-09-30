@@ -170,11 +170,12 @@ export default function Sidebar({ onSelect, selectedId }) {
       fontSize: "14px",
     },
     searchContainer: {
-      padding: "12px",
+      padding: "12px 16px",
       borderBottom: "1px solid #374151",
     },
     searchBox: {
       position: "relative",
+      width: "240px", // Made even shorter - from 260px to 240px
     },
     searchIcon: {
       position: "absolute",
@@ -347,7 +348,7 @@ export default function Sidebar({ onSelect, selectedId }) {
         </Link>
       )}
 
-      {/* Search Bar */}
+      {/* Search Bar - Now even shorter */}
       <div style={styles.searchContainer}>
         <div style={styles.searchBox}>
           <div style={styles.searchIcon}>🔍</div>
