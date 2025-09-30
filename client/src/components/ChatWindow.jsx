@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import InfoComponent from "./InfoComponent";
 import MessageReactions from "./MessageReactions";
 import { api } from "../lib/api.js";
-import PinnedMessages from "./PinnedMessages"; 
-import ForwardModal from './ForwardModal';
+import PinnedMessages from "./PinnedMessages";
+import ForwardModal from "./ForwardModal";
 
 export default function ChatWindow({
   me,
@@ -11,10 +11,10 @@ export default function ChatWindow({
   messages,
   setMessages,
   onReaction,
-  onPinMessage, 
+  onPinMessage,
   onUnpinMessage,
   onDeleteMessage,
-  onForwardMessage
+  onForwardMessage,
 }) {
   const endRef = useRef(null);
   const [showInfo, setShowInfo] = useState(false);
@@ -132,6 +132,18 @@ export default function ChatWindow({
     return avatarUrl;
   };
 
+  // Function to get file URL
+  const getFileUrl = (file) => {
+    if (!file?.url) return null;
+    let fileUrl = file.url;
+    if (!fileUrl.startsWith("http")) {
+      fileUrl = `http://localhost:5000${
+        fileUrl.startsWith("/") ? "" : "/"
+      }${fileUrl}`;
+    }
+    return fileUrl;
+  };
+
   const Avatar = ({ user, size = 32, onClick }) => {
     const [imageError, setImageError] = useState(false);
     const avatarUrl = getAvatarUrl(user);
@@ -178,6 +190,77 @@ export default function ChatWindow({
     );
   };
 
+  // Render file message content
+  const renderFileContent = (msg) => {
+    const fileUrl = getFileUrl(msg.file);
+
+    if (!fileUrl) {
+      return <div>File not available</div>;
+    }
+
+    // Check if it's an image
+    const isImage =
+      msg.file?.mimetype?.startsWith("image/") ||
+      msg.file?.originalName?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+
+    if (isImage) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <img
+            src={fileUrl}
+            alt={msg.file.originalName}
+            style={{
+              maxWidth: "300px",
+              maxHeight: "300px",
+              borderRadius: "12px",
+              objectFit: "cover",
+              border: "1px solid #374151",
+            }}
+            onError={(e) => {
+              console.error("Failed to load image:", fileUrl);
+              e.target.style.display = "none";
+            }}
+          />
+          <div style={{ fontSize: "12px", color: "#d1d5db" }}>
+            {msg.file.originalName}
+          </div>
+        </div>
+      );
+    }
+
+    // For non-image files, show a file download link
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "8px",
+          padding: "8px",
+        }}
+      >
+        <div style={{ fontSize: "24px" }}>📎</div>
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          <a
+            href={fileUrl}
+            download={msg.file.originalName}
+            style={{
+              color: "#3b82f6",
+              textDecoration: "none",
+              fontWeight: "500",
+            }}
+            onMouseEnter={(e) => (e.target.style.textDecoration = "underline")}
+            onMouseLeave={(e) => (e.target.style.textDecoration = "none")}
+          >
+            {msg.file.originalName}
+          </a>
+          <div style={{ fontSize: "12px", color: "#9ca3af" }}>
+            {(msg.file.size / 1024).toFixed(1)} KB
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleToggleReaction = (messageId, e) => {
     if (e) e.stopPropagation();
     setOpenReactionMenu(openReactionMenu === messageId ? null : messageId);
@@ -192,19 +275,19 @@ export default function ChatWindow({
   const handleMessageAction = (messageId, action, e) => {
     if (e) e.stopPropagation();
     setShowMessageMenu(null);
-    
+
     switch (action) {
-      case 'delete':
+      case "delete":
         setShowDeleteMenu(messageId);
         break;
-      case 'forward':
+      case "forward":
         setSelectedMessages([messageId]);
         setShowForwardModal(true);
         break;
-      case 'pin':
+      case "pin":
         onPinMessage(messageId);
         break;
-      case 'unpin':
+      case "unpin":
         onUnpinMessage(messageId);
         break;
       default:
@@ -243,7 +326,7 @@ export default function ChatWindow({
   };
 
   // Get pinned messages
-  const pinnedMessages = localMessages.filter(msg => msg.isPinned);
+  const pinnedMessages = localMessages.filter((msg) => msg.isPinned);
   const pinnedMessagesCount = pinnedMessages.length;
 
   // Highlight search term in message text
@@ -290,12 +373,14 @@ export default function ChatWindow({
           color: "#9ca3af",
           borderBottomRightRadius: isOwnMessage ? "4px" : "18px",
           borderBottomLeftRadius: isOwnMessage ? "18px" : "4px",
-          fontStyle: 'italic',
-          border: '1px dashed #6b7280',
+          fontStyle: "italic",
+          border: "1px dashed #6b7280",
         }}
       >
         <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
-          {msg.deletedBy?.includes(me._id) ? "You deleted this message" : "This message was deleted"}
+          {msg.deletedBy?.includes(me._id)
+            ? "You deleted this message"
+            : "This message was deleted"}
         </div>
       </div>
     );
@@ -305,15 +390,17 @@ export default function ChatWindow({
   const renderForwardedMessage = (msg, text) => {
     return (
       <div>
-        <div style={{
-          color: '#3b82f6',
-          fontSize: '12px',
-          fontWeight: '500',
-          marginBottom: '4px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '4px'
-        }}>
+        <div
+          style={{
+            color: "#3b82f6",
+            fontSize: "12px",
+            fontWeight: "500",
+            marginBottom: "4px",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
           <span>↩️</span>
           <span>Forwarded</span>
         </div>
@@ -544,6 +631,7 @@ export default function ChatWindow({
             const isCurrentSearchResult =
               searchResults[currentResultIndex]?.index === index;
             const isDeleted = msg.isDeleted || msg.deletedBy?.includes(me._id);
+            const isFileMessage = msg.file && !isDeleted;
 
             return (
               <div
@@ -607,258 +695,304 @@ export default function ChatWindow({
                     {/* Message Bubble */}
                     {isDeleted ? (
                       renderDeletedMessage(msg, isOwnMessage)
+                    ) : isFileMessage ? (
+                      // File/Image Message
+                      <div
+                        style={{
+                          padding: "12px",
+                          borderRadius: "18px",
+                          backgroundColor: isOwnMessage ? "#3b82f6" : "#374151",
+                          color: "white",
+                          borderBottomRightRadius: isOwnMessage
+                            ? "4px"
+                            : "18px",
+                          borderBottomLeftRadius: isOwnMessage ? "18px" : "4px",
+                          position: "relative",
+                        }}
+                      >
+                        {renderFileContent(msg)}
+                      </div>
                     ) : (
+                      // Text Message
                       <div
                         style={{
                           padding: "12px 16px",
                           borderRadius: "18px",
                           backgroundColor: isOwnMessage ? "#3b82f6" : "#374151",
                           color: "white",
-                          borderBottomRightRadius: isOwnMessage ? "4px" : "18px",
+                          borderBottomRightRadius: isOwnMessage
+                            ? "4px"
+                            : "18px",
                           borderBottomLeftRadius: isOwnMessage ? "18px" : "4px",
                           position: "relative",
                           minWidth: "60px",
                         }}
                       >
                         <div style={{ fontSize: "14px", lineHeight: "1.4" }}>
-                          {msg.isForwarded ? renderForwardedMessage(msg, msg.text) : 
-                           searchTerm ? highlightText(msg.text, searchTerm) : msg.text}
+                          {msg.isForwarded
+                            ? renderForwardedMessage(msg, msg.text)
+                            : searchTerm
+                            ? highlightText(msg.text, searchTerm)
+                            : msg.text}
                         </div>
-
-                        {/* Pin/Unpin Button - Show on hover */}
-                        {isHovered && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (msg.isPinned) {
-                                handleUnpinMessage(msg._id);
-                              } else {
-                                handlePinMessage(msg._id);
-                              }
-                            }}
-                            style={{
-                              position: "absolute",
-                              top: "-8px",
-                              [isOwnMessage ? "right" : "left"]: "8px",
-                              background: "rgba(31, 41, 55, 0.9)",
-                              border: "1px solid #374151",
-                              color: msg.isPinned ? "#f59e0b" : "white",
-                              cursor: "pointer",
-                              fontSize: "10px",
-                              padding: "4px",
-                              borderRadius: "6px",
-                              width: "24px",
-                              height: "24px",
-                              display: "flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              transition: "all 0.2s",
-                              zIndex: 5,
-                            }}
-                            title={msg.isPinned ? "Unpin message" : "Pin message"}
-                          >
-                            {msg.isPinned ? "📌" : "📍"}
-                          </button>
-                        )}
                       </div>
                     )}
 
-                    {/* Message Actions Menu */}
-                    {showMessageMenu === msg._id && !isDeleted && (
-                      <div style={{
-                        position: 'absolute',
-                        top: '100%',
-                        [isOwnMessage ? 'right' : 'left']: '0',
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '8px',
-                        padding: '8px',
-                        zIndex: 1000,
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        minWidth: '120px',
-                      }}>
-                        <button
-                          onClick={(e) => handleMessageAction(msg._id, 'forward', e)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            textAlign: 'left',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#374151'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                        >
-                          <span>↩️</span>
-                          Forward
-                        </button>
-                        
-                        <button
-                          onClick={(e) => handleMessageAction(msg._id, msg.isPinned ? 'unpin' : 'pin', e)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            textAlign: 'left',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#374151'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                        >
-                          <span>{msg.isPinned ? '📌' : '📍'}</span>
-                          {msg.isPinned ? 'Unpin' : 'Pin'}
-                        </button>
-                        
-                        <button
-                          onClick={(e) => handleMessageAction(msg._id, 'delete', e)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            padding: '8px 12px',
-                            borderRadius: '4px',
-                            fontSize: '12px',
-                            textAlign: 'left',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                          }}
-                          onMouseEnter={(e) => e.target.style.backgroundColor = '#374151'}
-                          onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                        >
-                          <span>🗑️</span>
-                          Delete
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Reaction Trigger Button - Only show on hover for non-deleted messages */}
+                    {/* Pin/Unpin Button - Show on hover */}
                     {isHovered && !isDeleted && (
                       <button
-                        className="reaction-trigger"
-                        onClick={(e) => handleToggleReaction(msg._id, e)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (msg.isPinned) {
+                            handleUnpinMessage(msg._id);
+                          } else {
+                            handlePinMessage(msg._id);
+                          }
+                        }}
                         style={{
                           position: "absolute",
-                          top: "50%",
-                          [isOwnMessage ? "left" : "right"]: "-20px",
-                          transform: "translateY(-50%)",
-                          background: "#1f2937",
+                          top: "-8px",
+                          [isOwnMessage ? "right" : "left"]: "8px",
+                          background: "rgba(31, 41, 55, 0.9)",
                           border: "1px solid #374151",
-                          color: "#9ca3af",
+                          color: msg.isPinned ? "#f59e0b" : "white",
                           cursor: "pointer",
-                          fontSize: "14px",
-                          width: "28px",
-                          height: "28px",
-                          borderRadius: "50%",
+                          fontSize: "10px",
+                          padding: "4px",
+                          borderRadius: "6px",
+                          width: "24px",
+                          height: "24px",
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          zIndex: 10,
                           transition: "all 0.2s",
+                          zIndex: 5,
                         }}
-                        title="Add reaction"
+                        title={msg.isPinned ? "Unpin message" : "Pin message"}
                       >
-                        ♥
+                        {msg.isPinned ? "📌" : "📍"}
                       </button>
-                    )}
-
-                    {/* Reaction Picker Menu */}
-                    {openReactionMenu === msg._id && !isDeleted && (
-                      <div
-                        style={{
-                          position: "absolute",
-                          bottom: "100%",
-                          [isOwnMessage ? "right" : "left"]: "0",
-                          marginBottom: "8px",
-                          zIndex: 1000,
-                        }}
-                      >
-                        <MessageReactions
-                          message={msg}
-                          onReact={handleReactionSelect}
-                          currentUserId={me._id}
-                          isOpen={true}
-                          onToggle={() => handleToggleReaction(msg._id)}
-                          position={isOwnMessage ? "right" : "left"}
-                        />
-                      </div>
                     )}
                   </div>
 
-                  {/* Display Existing Reactions */}
-                  {hasReactions && !isDeleted && (
+                  {/* Message Actions Menu */}
+                  {showMessageMenu === msg._id && !isDeleted && (
                     <div
                       style={{
+                        position: "absolute",
+                        top: "100%",
+                        [isOwnMessage ? "right" : "left"]: "0",
+                        backgroundColor: "#1f2937",
+                        border: "1px solid #374151",
+                        borderRadius: "8px",
+                        padding: "8px",
+                        zIndex: 1000,
+                        boxShadow: "0 4px 12px rgba(0, 0, 0, 0.3)",
                         display: "flex",
+                        flexDirection: "column",
                         gap: "4px",
-                        flexWrap: "wrap",
-                        marginTop: "2px",
-                        padding: "0 4px",
+                        minWidth: "120px",
                       }}
                     >
-                      {Object.entries(
-                        msg.reactions.reduce((acc, reaction) => {
-                          const reactionType = reaction.reaction;
-                          acc[reactionType] = (acc[reactionType] || 0) + 1;
-                          return acc;
-                        }, {})
-                      ).map(([reaction, count]) => (
-                        <div
-                          key={reaction}
-                          style={{
-                            backgroundColor: "#1f2937",
-                            padding: "2px 6px",
-                            borderRadius: "12px",
-                            fontSize: "12px",
-                            border: "1px solid #374151",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "2px",
-                          }}
-                        >
-                          <span>{reaction}</span>
-                          {count > 1 && (
-                            <span style={{ fontSize: "10px" }}>{count}</span>
-                          )}
-                        </div>
-                      ))}
+                      <button
+                        onClick={(e) =>
+                          handleMessageAction(msg._id, "forward", e)
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "white",
+                          cursor: "pointer",
+                          padding: "8px 12px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.target.style.backgroundColor = "#374151")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.target.style.backgroundColor = "transparent")
+                        }
+                      >
+                        <span>↩️</span>
+                        Forward
+                      </button>
+
+                      <button
+                        onClick={(e) =>
+                          handleMessageAction(
+                            msg._id,
+                            msg.isPinned ? "unpin" : "pin",
+                            e
+                          )
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "white",
+                          cursor: "pointer",
+                          padding: "8px 12px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.target.style.backgroundColor = "#374151")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.target.style.backgroundColor = "transparent")
+                        }
+                      >
+                        <span>{msg.isPinned ? "📌" : "📍"}</span>
+                        {msg.isPinned ? "Unpin" : "Pin"}
+                      </button>
+
+                      <button
+                        onClick={(e) =>
+                          handleMessageAction(msg._id, "delete", e)
+                        }
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#ef4444",
+                          cursor: "pointer",
+                          padding: "8px 12px",
+                          borderRadius: "4px",
+                          fontSize: "12px",
+                          textAlign: "left",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "6px",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.target.style.backgroundColor = "#374151")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.target.style.backgroundColor = "transparent")
+                        }
+                      >
+                        <span>🗑️</span>
+                        Delete
+                      </button>
                     </div>
                   )}
 
-                  {/* Time Stamp */}
-                  <div
-                    style={{
-                      fontSize: "11px",
-                      color: "#9ca3af",
-                      padding: "0 12px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    {formatTime(msg.createdAt)}
-                    {isOwnMessage && !isDeleted && " ✓"}
-                    {msg.isPinned && !isDeleted && " 📌"}
-                    {msg.isForwarded && !isDeleted && " ↩️"}
-                  </div>
+                  {/* Reaction Trigger Button - Only show on hover for non-deleted messages */}
+                  {isHovered && !isDeleted && (
+                    <button
+                      className="reaction-trigger"
+                      onClick={(e) => handleToggleReaction(msg._id, e)}
+                      style={{
+                        position: "absolute",
+                        top: "50%",
+                        [isOwnMessage ? "left" : "right"]: "-20px",
+                        transform: "translateY(-50%)",
+                        background: "#1f2937",
+                        border: "1px solid #374151",
+                        color: "#9ca3af",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        width: "28px",
+                        height: "28px",
+                        borderRadius: "50%",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        zIndex: 10,
+                        transition: "all 0.2s",
+                      }}
+                      title="Add reaction"
+                    >
+                      ♥
+                    </button>
+                  )}
+
+                  {/* Reaction Picker Menu */}
+                  {openReactionMenu === msg._id && !isDeleted && (
+                    <div
+                      style={{
+                        position: "absolute",
+                        bottom: "100%",
+                        [isOwnMessage ? "right" : "left"]: "0",
+                        marginBottom: "8px",
+                        zIndex: 1000,
+                      }}
+                    >
+                      <MessageReactions
+                        message={msg}
+                        onReact={handleReactionSelect}
+                        currentUserId={me._id}
+                        isOpen={true}
+                        onToggle={() => handleToggleReaction(msg._id)}
+                        position={isOwnMessage ? "right" : "left"}
+                      />
+                    </div>
+                  )}
                 </div>
 
+                {/* Display Existing Reactions */}
+                {hasReactions && !isDeleted && (
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "4px",
+                      flexWrap: "wrap",
+                      marginTop: "2px",
+                      padding: "0 4px",
+                    }}
+                  >
+                    {Object.entries(
+                      msg.reactions.reduce((acc, reaction) => {
+                        const reactionType = reaction.reaction;
+                        acc[reactionType] = (acc[reactionType] || 0) + 1;
+                        return acc;
+                      }, {})
+                    ).map(([reaction, count]) => (
+                      <div
+                        key={reaction}
+                        style={{
+                          backgroundColor: "#1f2937",
+                          padding: "2px 6px",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                          border: "1px solid #374151",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "2px",
+                        }}
+                      >
+                        <span>{reaction}</span>
+                        {count > 1 && (
+                          <span style={{ fontSize: "10px" }}>{count}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Time Stamp */}
+                <div
+                  style={{
+                    fontSize: "11px",
+                    color: "#9ca3af",
+                    padding: "0 12px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "4px",
+                  }}
+                >
+                  {formatTime(msg.createdAt)}
+                  {isOwnMessage && !isDeleted && " ✓"}
+                  {msg.isPinned && !isDeleted && " 📌"}
+                  {msg.isForwarded && !isDeleted && " ↩️"}
+                </div>
                 {isOwnMessage && <Avatar user={me} size={32} />}
               </div>
             );
@@ -879,43 +1013,49 @@ export default function ChatWindow({
 
       {/* Delete Confirmation Modal */}
       {showDeleteMenu && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 10000,
-        }}>
-          <div style={{
-            backgroundColor: '#1f2937',
-            border: '1px solid #374151',
-            borderRadius: '12px',
-            padding: '20px',
-            maxWidth: '400px',
-            width: '90%',
-          }}>
-            <h3 style={{ color: 'white', marginBottom: '12px' }}>
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.7)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 10000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: "#1f2937",
+              border: "1px solid #374151",
+              borderRadius: "12px",
+              padding: "20px",
+              maxWidth: "400px",
+              width: "90%",
+            }}
+          >
+            <h3 style={{ color: "white", marginBottom: "12px" }}>
               Delete Message
             </h3>
-            <p style={{ color: '#9ca3af', marginBottom: '20px' }}>
+            <p style={{ color: "#9ca3af", marginBottom: "20px" }}>
               Are you sure you want to delete this message?
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
               <button
                 onClick={() => handleDeleteConfirm(showDeleteMenu, true)}
                 style={{
-                  backgroundColor: '#ef4444',
-                  border: 'none',
-                  color: 'white',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
+                  backgroundColor: "#ef4444",
+                  border: "none",
+                  color: "white",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
                 }}
               >
                 Delete for Everyone
@@ -923,13 +1063,13 @@ export default function ChatWindow({
               <button
                 onClick={() => handleDeleteConfirm(showDeleteMenu, false)}
                 style={{
-                  backgroundColor: '#374151',
-                  border: 'none',
-                  color: 'white',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
+                  backgroundColor: "#374151",
+                  border: "none",
+                  color: "white",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
                 }}
               >
                 Delete for Me
@@ -937,13 +1077,13 @@ export default function ChatWindow({
               <button
                 onClick={() => setShowDeleteMenu(null)}
                 style={{
-                  backgroundColor: 'transparent',
-                  border: '1px solid #374151',
-                  color: '#9ca3af',
-                  padding: '10px',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  fontSize: '14px',
+                  backgroundColor: "transparent",
+                  border: "1px solid #374151",
+                  color: "#9ca3af",
+                  padding: "10px",
+                  borderRadius: "8px",
+                  cursor: "pointer",
+                  fontSize: "14px",
                 }}
               >
                 Cancel
@@ -956,7 +1096,9 @@ export default function ChatWindow({
       {/* Forward Modal */}
       {showForwardModal && (
         <ForwardModal
-          messages={selectedMessages.map(id => localMessages.find(msg => msg._id === id))}
+          messages={selectedMessages.map((id) =>
+            localMessages.find((msg) => msg._id === id)
+          )}
           onForward={onForwardMessage}
           onClose={() => {
             setShowForwardModal(false);
