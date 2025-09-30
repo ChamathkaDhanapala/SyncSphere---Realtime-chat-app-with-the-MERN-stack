@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    cb(null, file.fieldname + "-" + uniqueSuffix + "-" + file.originalname);
+    cb(null, "file-" + uniqueSuffix + path.extname(file.originalname));
   },
 });
 
@@ -36,6 +36,7 @@ const upload = multer({
       "image/jpeg",
       "image/png",
       "image/gif",
+      "image/webp",
       "application/pdf",
       "text/plain",
       "application/msword",
@@ -55,44 +56,110 @@ router.get("/test", (req, res) => {
   res.json({ message: "Messages route is working!" });
 });
 
+// Get messages between current user and another user
+router.get("/:userId", protect, async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    console.log("📥 Loading messages for users:", req.user._id, "and", userId);
+
+    let conversation = await Conversation.findOne({
+      participants: { $all: [req.user._id, userId] },
+    });
+
+    if (!conversation) {
+      console.log("📥 No conversation found, returning empty array");
+      return res.json([]);
+    }
+
+    const messages = await Message.find({
+      conversation: conversation._id,
+      $or: [
+        { isDeleted: false },
+        { isDeleted: true, deletedBy: { $ne: req.user._id } },
+      ],
+    })
+      .populate("sender", "username avatarUrl")
+      .populate("reactions.user", "username")
+      .sort({ createdAt: 1 });
+
+    console.log(
+      `📥 Loaded ${messages.length} messages for conversation ${conversation._id}`
+    );
+
+    const fileMessages = messages.filter((msg) => msg.isFile);
+    if (fileMessages.length > 0) {
+      console.log(`📁 Found ${fileMessages.length} file messages:`);
+      fileMessages.forEach((msg) => {
+        console.log(
+          `   - ${msg._id}: ${msg.file?.originalName} (${msg.file?.mimetype})`
+        );
+      });
+    }
+
+    res.json(messages);
+  } catch (error) {
+    console.error("Get messages error:", error);
+    res.status(500).json({ message: "Error fetching messages" });
+  }
+});
+
+// Send text message
+router.post("/send", protect, sendMessage);
+
 // File upload endpoint
 router.post("/send-file", protect, upload.single("file"), async (req, res) => {
   try {
+    console.log("📁 File upload request received");
+    console.log("📁 Request body:", req.body);
+    console.log("📁 Uploaded file:", req.file);
+    console.log("📁 Authenticated user:", req.user._id);
+
     const { to } = req.body;
 
     if (!req.file) {
+      console.log("❌ No file in request");
       return res.status(400).json({ message: "No file uploaded" });
     }
 
     if (!to) {
+      console.log("❌ No recipient specified");
       return res.status(400).json({ message: "Recipient is required" });
     }
 
     // Find or create conversation
     let conversation = await Conversation.findOne({
-      participants: { $all: [req.user.id, to] },
+      participants: { $all: [req.user._id, to] },
     });
 
     if (!conversation) {
+      console.log("💬 Creating new conversation");
       conversation = await Conversation.create({
-        participants: [req.user.id, to],
+        participants: [req.user._id, to],
       });
     }
 
+    console.log("💬 Using conversation:", conversation._id);
+
     // Create message with file
-    const message = await Message.create({
+    const messageData = {
       conversation: conversation._id,
-      sender: req.user.id,
+      sender: req.user._id,
       text: `File: ${req.file.originalname}`,
       isFile: true,
       file: {
-        name: req.file.originalname,
-        url: `/uploads/${req.file.filename}`,
-        type: req.file.mimetype,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        mimetype: req.file.mimetype,
         size: req.file.size,
+        url: `/uploads/${req.file.filename}`,
       },
-      seenBy: [req.user.id],
-    });
+      seenBy: [req.user._id],
+    };
+
+    console.log("📝 Creating message with data:", messageData);
+
+    const message = await Message.create(messageData);
 
     conversation.latestMessage = message._id;
     await conversation.save();
@@ -102,9 +169,12 @@ router.post("/send-file", protect, upload.single("file"), async (req, res) => {
       .populate("sender", "username avatarUrl")
       .populate("reactions.user", "username");
 
+    console.log("✅ File message saved to database:", populatedMessage._id);
+    console.log("✅ File details:", populatedMessage.file);
+
     res.status(201).json(populatedMessage);
   } catch (error) {
-    console.error("File upload error:", error);
+    console.error("❌ File upload error:", error);
     res
       .status(500)
       .json({ message: "File upload failed", error: error.message });
@@ -129,7 +199,7 @@ router.post("/pin", protect, async (req, res) => {
 
     message.isPinned = isPinned;
     if (isPinned) {
-      message.pinnedBy = req.user.id;
+      message.pinnedBy = req.user._id;
       message.pinnedAt = new Date();
     } else {
       message.pinnedBy = undefined;
@@ -175,7 +245,7 @@ router.post("/delete", protect, async (req, res) => {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       if (
         message.createdAt < oneHourAgo &&
-        message.sender.toString() !== req.user.id
+        message.sender.toString() !== req.user._id
       ) {
         return res
           .status(403)
@@ -183,14 +253,14 @@ router.post("/delete", protect, async (req, res) => {
       }
 
       message.isDeleted = true;
-      message.deletedBy = [req.user.id];
+      message.deletedBy = [req.user._id];
       message.deletedAt = new Date();
     } else {
       // Delete for me only
       if (!message.deletedBy) {
-        message.deletedBy = [req.user.id];
-      } else if (!message.deletedBy.includes(req.user.id)) {
-        message.deletedBy.push(req.user.id);
+        message.deletedBy = [req.user._id];
+      } else if (!message.deletedBy.includes(req.user._id)) {
+        message.deletedBy.push(req.user._id);
       }
     }
 
@@ -212,7 +282,7 @@ router.post("/delete", protect, async (req, res) => {
   }
 });
 
-//  Forward message endpoint
+// Forward message endpoint
 router.post("/forward", protect, async (req, res) => {
   try {
     console.log("↩️ Forward request received:", req.body);
@@ -229,12 +299,12 @@ router.post("/forward", protect, async (req, res) => {
 
     for (const toUserId of toUsers) {
       let conversation = await Conversation.findOne({
-        participants: { $all: [req.user.id, toUserId] },
+        participants: { $all: [req.user._id, toUserId] },
       });
 
       if (!conversation) {
         conversation = await Conversation.create({
-          participants: [req.user.id, toUserId],
+          participants: [req.user._id, toUserId],
         });
       }
 
@@ -251,13 +321,13 @@ router.post("/forward", protect, async (req, res) => {
 
         const forwardedMessage = await Message.create({
           conversation: conversation._id,
-          sender: req.user.id,
+          sender: req.user._id,
           text: originalMessage.text,
           isFile: originalMessage.isFile,
           file: originalMessage.file,
           isForwarded: true,
           forwardedFrom: messageId,
-          seenBy: [req.user.id],
+          seenBy: [req.user._id],
         });
 
         conversation.latestMessage = forwardedMessage._id;
@@ -284,9 +354,5 @@ router.post("/forward", protect, async (req, res) => {
       .json({ message: "Failed to forward message", error: error.message });
   }
 });
-
-// Normal text message routes
-router.get("/:userId", protect, getMessagesWithUser);
-router.post("/send", protect, sendMessage);
 
 export default router;
