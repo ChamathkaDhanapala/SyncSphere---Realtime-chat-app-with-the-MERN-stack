@@ -6,7 +6,6 @@ import Message from "./models/Message.js";
 const onlineUsers = new Map();
 
 export function setupSocket(io) {
-  // Make io available globally for routes
   global.io = io;
   global.onlineUsers = onlineUsers;
 
@@ -32,15 +31,17 @@ export function setupSocket(io) {
     console.log("📊 Online users:", Array.from(onlineUsers.entries()));
 
     // --- Send Message ---
-    socket.on("message:send", async ({ to, text }) => {
+    socket.on("message:send", async ({ to, text, file, isFile }) => {
       console.log(
         "🔵 BACKEND: Message received from:",
         socket.userId,
         "to:",
-        to
+        to,
+        "isFile:",
+        isFile
       );
 
-      if (!to || !text) return;
+      if (!to || (!text && !file)) return;
 
       try {
         let convo = await Conversation.findOne({
@@ -52,13 +53,22 @@ export function setupSocket(io) {
           });
         }
 
-        const msg = await Message.create({
+        const msgData = {
           conversation: convo._id,
           sender: socket.userId,
-          text,
           seenBy: [socket.userId],
           reactions: [],
-        });
+        };
+
+        if (isFile && file) {
+          msgData.text = text || `File: ${file.originalName}`;
+          msgData.file = file;
+          msgData.isFile = true;
+        } else {
+          msgData.text = text;
+        }
+
+        const msg = await Message.create(msgData);
 
         convo.latestMessage = msg._id;
         await convo.save();
@@ -69,7 +79,12 @@ export function setupSocket(io) {
           "username avatarUrl"
         );
 
-        console.log("📨 BACKEND: Message created:", populatedMessage._id);
+        console.log(
+          "📨 BACKEND: Message created:",
+          populatedMessage._id,
+          "File:",
+          isFile
+        );
 
         // Emit to sender
         io.to(socket.id).emit("message:new", { message: populatedMessage });
