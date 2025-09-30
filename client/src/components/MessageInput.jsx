@@ -4,6 +4,7 @@ import EmojiPicker from "./EmojiPicker";
 export default function MessageInput({ onSend, onFileSend, socket, peer }) {
   const [text, setText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const fileInputRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -39,7 +40,6 @@ export default function MessageInput({ onSend, onFileSend, socket, peer }) {
     event.target.value = "";
   };
 
-  // Define handleSubmit before it's used
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
@@ -54,7 +54,6 @@ export default function MessageInput({ onSend, onFileSend, socket, peer }) {
     }
   };
 
-  // Define handleEmojiSelect
   const handleEmojiSelect = (emoji) => {
     setText((prev) => prev + emoji);
     if (textareaRef.current) {
@@ -102,42 +101,136 @@ export default function MessageInput({ onSend, onFileSend, socket, peer }) {
     }
   }, [text]);
 
+  const placeholderText = peer?.username 
+    ? `Message ${peer.username}...`
+    : "Type a message...";
+
+  const styles = {
+    container: {
+      padding: "16px 20px",
+      backgroundColor: "#1f2937",
+      borderTop: "1px solid rgba(255, 255, 255, 0.1)",
+    },
+    form: {
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      maxWidth: "800px",
+      margin: "0 auto",
+    },
+    inputContainer: {
+      flex: 1,
+      position: "relative",
+      background: "rgba(255, 255, 255, 0.05)",
+      borderRadius: "20px",
+      border: "1px solid rgba(255, 255, 255, 0.1)",
+      minHeight: "44px",
+      display: "flex",
+      alignItems: "center",
+      transition: "all 0.2s ease",
+    },
+    inputContainerFocused: {
+      borderColor: "#3b82f6",
+      background: "rgba(255, 255, 255, 0.08)",
+    },
+    textarea: {
+      flex: 1,
+      background: "transparent",
+      border: "none",
+      outline: "none",
+      color: "white",
+      padding: "12px 16px",
+      borderRadius: "20px",
+      resize: "none",
+      maxHeight: "100px",
+      fontFamily: "inherit",
+      fontSize: "14px",
+      lineHeight: "1.4",
+      fontWeight: "400",
+    },
+    sendButton: {
+      background: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)",
+      border: "none",
+      color: "white",
+      cursor: "pointer",
+      padding: "12px 20px",
+      borderRadius: "12px",
+      fontSize: "14px",
+      fontWeight: "600",
+      transition: "all 0.2s ease",
+      flexShrink: 0,
+      minWidth: "70px",
+      height: "44px",
+      boxShadow: "0 2px 10px rgba(59, 130, 246, 0.3)",
+    },
+    sendButtonHover: {
+      transform: "translateY(-1px)",
+      boxShadow: "0 4px 15px rgba(59, 130, 246, 0.4)",
+    },
+    sendButtonDisabled: {
+      background: "rgba(255, 255, 255, 0.05)",
+      border: "1px solid rgba(255, 255, 255, 0.1)",
+      color: "#6b7280",
+      cursor: "not-allowed",
+      boxShadow: "none",
+    },
+    fileButton: {
+      background: "linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)",
+      border: "none",
+      color: "white",
+      cursor: "pointer",
+      padding: "10px",
+      borderRadius: "10px",
+      fontSize: "18px",
+      transition: "all 0.2s ease",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "44px",
+      height: "44px",
+      boxShadow: "0 2px 10px rgba(139, 92, 246, 0.3)",
+    },
+    fileButtonHover: {
+      transform: "translateY(-1px)",
+      boxShadow: "0 4px 15px rgba(139, 92, 246, 0.4)",
+    },
+    emojiButton: {
+      background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+      border: "none",
+      color: "white",
+      cursor: "pointer",
+      padding: "10px",
+      borderRadius: "10px",
+      fontSize: "18px",
+      transition: "all 0.2s ease",
+      flexShrink: 0,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      width: "44px",
+      height: "44px",
+      boxShadow: "0 2px 10px rgba(16, 185, 129, 0.3)",
+    },
+    emojiButtonHover: {
+      transform: "translateY(-1px)",
+      boxShadow: "0 4px 15px rgba(16, 185, 129, 0.4)",
+    },
+  };
+
   return (
-    <div
-      style={{
-        padding: "16px 20px",
-        backgroundColor: "#1f2937",
-        borderTop: "1px solid #374151",
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          display: "flex",
-          alignItems: "flex-end",
-          gap: "12px",
-        }}
-      >
+    <div style={styles.container}>
+      <form onSubmit={handleSubmit} style={styles.form}>
         {/* File Upload Button */}
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          style={{
-            background: "none",
-            border: "none",
-            color: "#9ca3af",
-            cursor: "pointer",
-            padding: "8px",
-            borderRadius: "8px",
-            fontSize: "20px",
-            transition: "background-color 0.2s",
-            flexShrink: 0,
-          }}
+          style={styles.fileButton}
           onMouseEnter={(e) => {
-            e.target.style.backgroundColor = "#374151";
+            Object.assign(e.target.style, styles.fileButtonHover);
           }}
           onMouseLeave={(e) => {
-            e.target.style.backgroundColor = "transparent";
+            Object.assign(e.target.style, styles.fileButton);
           }}
         >
           📎
@@ -155,47 +248,43 @@ export default function MessageInput({ onSend, onFileSend, socket, peer }) {
         <EmojiPicker
           onEmojiSelect={handleEmojiSelect}
           position="top"
-          trigger="😃"
+          trigger={
+            <button
+              type="button"
+              style={styles.emojiButton}
+              onMouseEnter={(e) => {
+                Object.assign(e.target.style, styles.emojiButtonHover);
+              }}
+              onMouseLeave={(e) => {
+                Object.assign(e.target.style, styles.emojiButton);
+              }}
+            >
+              😊
+            </button>
+          }
         />
 
         {/* Message Input */}
         <div
           style={{
-            flex: 1,
-            position: "relative",
-            backgroundColor: "#374151",
-            borderRadius: "24px",
-            border: "1px solid #4b5563",
-            minHeight: "44px",
-            display: "flex",
-            alignItems: "center",
+            ...styles.inputContainer,
+            ...(isFocused ? styles.inputContainerFocused : {}),
           }}
         >
           <textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="Type a message..."
-            style={{
-              flex: 1,
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              color: "white",
-              padding: "12px 16px",
-              borderRadius: "24px",
-              resize: "none",
-              maxHeight: "120px",
-              fontFamily: "inherit",
-              fontSize: "14px",
-              lineHeight: "1.4",
-            }}
+            placeholder={placeholderText}
+            style={styles.textarea}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
                 handleSubmit(e);
               }
             }}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
           />
         </div>
 
@@ -204,29 +293,26 @@ export default function MessageInput({ onSend, onFileSend, socket, peer }) {
           type="submit"
           disabled={!text.trim()}
           style={{
-            background: text.trim() ? "#3b82f6" : "#374151",
-            border: "none",
-            color: "white",
-            cursor: text.trim() ? "pointer" : "not-allowed",
-            padding: "8px 16px",
-            borderRadius: "8px",
-            fontSize: "14px",
-            fontWeight: "600",
-            transition: "background-color 0.2s",
-            flexShrink: 0,
+            ...styles.sendButton,
+            ...(!text.trim() ? styles.sendButtonDisabled : {}),
           }}
           onMouseEnter={(e) => {
             if (text.trim()) {
-              e.target.style.backgroundColor = "#2563eb";
+              Object.assign(e.target.style, styles.sendButtonHover);
             }
           }}
           onMouseLeave={(e) => {
-            if (text.trim()) {
-              e.target.style.backgroundColor = "#3b82f6";
-            }
+            Object.assign(e.target.style, styles.sendButton);
           }}
         >
-          Send
+          {text.trim() ? (
+            <span style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+              Send
+              <span style={{ fontSize: "14px" }}>🚀</span>
+            </span>
+          ) : (
+            "Send"
+          )}
         </button>
       </form>
     </div>
