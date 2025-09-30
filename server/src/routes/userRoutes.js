@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import { listUsers, updateProfile } from "../controllers/userController.js"; // Remove debugUser
 import { protect } from "../middleware/auth.js";
+import adminAuth from "../middleware/adminAuth.js"; 
 import fs from "fs";
 
 const uploadsPath = path.join(process.cwd(), "uploads");
@@ -78,6 +79,97 @@ router.get("/check-path", protect, (req, res) => {
       }
     })()
   });
+});
+
+// Add these admin routes to your existing user.js file:
+
+// Admin routes - require both protect and adminAuth
+router.put("/:id/status", protect, adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+
+    // Prevent self-deactivation
+    if (id === req.user.id && !isActive) {
+      return res.status(400).json({ 
+        error: "Cannot deactivate your own account" 
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ 
+      message: `User ${isActive ? "activated" : "deactivated"} successfully`,
+      user 
+    });
+  } catch (error) {
+    console.error("Toggle status error:", error);
+    res.status(500).json({ error: "Failed to update user status" });
+  }
+});
+
+router.put("/:id/role", protect, adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isAdmin } = req.body;
+
+    // Prevent self-demotion
+    if (id === req.user.id && !isAdmin) {
+      return res.status(400).json({ 
+        error: "Cannot remove your own admin privileges" 
+      });
+    }
+
+    const user = await User.findByIdAndUpdate(
+      id,
+      { isAdmin },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ 
+      message: `Admin privileges ${isAdmin ? "granted" : "revoked"} successfully`,
+      user 
+    });
+  } catch (error) {
+    console.error("Toggle role error:", error);
+    res.status(500).json({ error: "Failed to update user role" });
+  }
+});
+
+router.delete("/:id", protect, adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent self-deletion
+    if (id === req.user.id) {
+      return res.status(400).json({ 
+        error: "Cannot delete your own account" 
+      });
+    }
+
+    const user = await User.findByIdAndDelete(id);
+
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    res.json({ message: "User deleted successfully" });
+  } catch (error) {
+    console.error("Delete user error:", error);
+    res.status(500).json({ error: "Failed to delete user" });
+  }
 });
 
 export default router;
