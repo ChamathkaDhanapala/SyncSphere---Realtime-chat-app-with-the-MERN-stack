@@ -110,11 +110,22 @@ const NotificationToast = ({
 
 export default function Chat() {
   const { user } = useAuth();
-  const { socket } = useSocket();
+  const { socket, isOnline } = useSocket();
   const [peer, setPeer] = useState(null);
   const [messages, setMessages] = useState([]);
   const [typingUsers, setTypingUsers] = useState({});
   const [notifications, setNotifications] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [socketReady, setSocketReady] = useState(false);
+
+  useEffect(() => {
+    if (socket && isOnline) {
+      console.log("✅ Socket is ready and connected");
+      setSocketReady(true);
+    } else {
+      setSocketReady(false);
+    }
+  }, [socket, isOnline]);
 
   // Browser notification function
   const showBrowserNotification = (title, body, icon) => {
@@ -179,7 +190,9 @@ export default function Chat() {
 
     const loadMessages = async () => {
       try {
+        console.log("📥 Loading messages for peer:", peer._id);
         const { data } = await api.get(`/messages/${peer._id}`);
+        console.log("📥 Messages loaded:", data?.length || 0);
         setMessages(data || []);
       } catch (error) {
         console.log("No messages found, starting fresh");
@@ -512,22 +525,64 @@ export default function Chat() {
       setNotifications((prev) =>
         prev.filter((n) => n.id !== sendingNotificationId)
       );
-      showNotification(`Failed to send to ${peer.username}`, "error");
 
-      if (socket) {
+      if (socketReady) {
         socket.emit("message:send", { to: peer._id, text });
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === tempMessage._id ? { ...msg, sent: true } : msg
+          )
+        );
+        showNotification(`Message sent to ${peer.username}`, "sent");
+      } else {
+        showNotification(`Failed to send - not connected`, "error");
+        // Remove the temp message if socket is not available
+        setMessages((prev) =>
+          prev.filter((msg) => msg._id !== tempMessage._id)
+        );
       }
-
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg._id === tempMessage._id ? { ...msg, sent: true } : msg
-        )
-      );
     }
   };
 
   const sendFile = async (file) => {
-    if (!peer || !file) return;
+    if (!peer || !file || isUploading) {
+      showNotification("Cannot upload file right now", "error");
+      return;
+    }
+
+    console.log("📁 Starting file upload:", file.name, file.type, file.size);
+
+    // Validate file size (10MB limit)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      showNotification("File too large (max 10MB)", "error");
+      return;
+    }
+
+    // Validate file type
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "application/pdf",
+      "text/plain",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    if (!allowedTypes.includes(file.type)) {
+      showNotification("File type not allowed", "error");
+      return;
+    }
+
+    if (!socketReady) {
+      showNotification("Not connected to server", "error");
+      return;
+    }
+
+    setIsUploading(true);
 
     const tempMessage = {
       _id: Date.now().toString(),
@@ -547,14 +602,22 @@ export default function Chat() {
     };
 
     setMessages((prev) => [...prev, tempMessage]);
+    console.log("📝 Temp message created:", tempMessage._id);
 
-    showNotification(`Uploading ${file.name} to ${peer.username}...`, "info");
+    showNotification(`Uploading ${file.name}...`, "info");
 
     try {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("to", peer._id);
 
+      console.log("📤 Uploading file to:", "/api/messages/send-file");
+      console.log("📤 FormData entries:");
+      for (let pair of formData.entries()) {
+        console.log(pair[0] + ": ", pair[1]);
+      }
+
+      console.log("📤 Making API request...");
       const { data } = await api.post("/messages/send-file", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
@@ -562,17 +625,47 @@ export default function Chat() {
         timeout: 30000,
       });
 
-      setMessages((prev) =>
-        prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
-      );
+      console.log("✅ Upload response received:", data);
 
-      // Show success notification
-      showNotification(`File sent to ${peer.username}: ${file.name}`, "sent");
+      if (data && data._id) {
+        console.log("✅ File message saved successfully:", data._id);
+        console.log("✅ File data:", data.file);
+
+        setMessages((prev) =>
+          prev.map((msg) => (msg._id === tempMessage._id ? data : msg))
+        );
+
+        // Show success notification
+        showNotification(
+          `File sent to ${peer.username}: ${
+            data.file?.originalName || file.name
+          }`,
+          "success"
+        );
+        console.log("✅ File message successfully saved and displayed");
+      } else {
+        console.error("❌ Invalid response data:", data);
+        throw new Error("Invalid response from server");
+      }
     } catch (error) {
-      console.error("File upload failed:", error);
+      console.error("❌ File upload failed:", error);
 
-      // Show error notification
-      showNotification(`Failed to send file to ${peer.username}`, "error");
+      let errorMessage = "Failed to send file";
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.code === "ECONNABORTED") {
+        errorMessage = "File upload timeout";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+
+      console.error("❌ Upload error details:", {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: errorMessage,
+      });
+
+      showNotification(`Upload failed: ${errorMessage}`, "error");
 
       setMessages((prev) =>
         prev.map((msg) =>
@@ -583,24 +676,30 @@ export default function Chat() {
                 file: {
                   ...msg.file,
                   uploadFailed: true,
-                  error: error.response?.data?.message || "Upload failed",
+                  error: errorMessage,
                 },
               }
             : msg
         )
       );
+    } finally {
+      setIsUploading(false);
     }
   };
 
-  const enhancedMessages = messages.map((msg) => {
-    if (msg.isFile && msg.file) {
-      return {
-        ...msg,
-        text: `File: ${msg.file.name}`,
-      };
-    }
-    return msg;
-  });
+  const getEnhancedMessages = () => {
+    return messages.map((msg) => {
+      if (msg.file && !msg.text?.startsWith("File:")) {
+        return {
+          ...msg,
+          text: msg.text || `File: ${msg.file.originalName || msg.file.name}`,
+        };
+      }
+      return msg;
+    });
+  };
+
+  const enhancedMessages = getEnhancedMessages();
 
   return (
     <div
@@ -776,6 +875,7 @@ export default function Chat() {
                 onFileSend={sendFile}
                 socket={socket}
                 peer={peer}
+                isUploading={isUploading}
               />
             </div>
           </>
